@@ -12,13 +12,14 @@ interface StockListProps {
   stocks: StockData[];
   onDelete?: (stock: StockData) => void;
   onAdd?: (stock: StockData) => void;
+  onStarPress?: (stock: StockData) => void;
 }
 
 /**
  * Reusable component that displays a list of swipeable stocks.
  * Accepts an array of stock data and renders them with swipe actions.
  */
-export function StockList({ stocks, onDelete, onAdd }: StockListProps) {
+export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListProps) {
   return (
     <View style={styles.container}>
       {stocks.map((stock, index) => (
@@ -29,6 +30,8 @@ export function StockList({ stocks, onDelete, onAdd }: StockListProps) {
           pricePerShare={stock.pricePerShare}
           logo={stock.logo}
           isPositive={stock.isPositive}
+          isStarred={stock.isStarred}
+          onStarPress={onStarPress ? () => onStarPress?.(stock) : undefined}
           onDelete={onDelete ? () => onDelete?.(stock) : undefined}
           onAdd={onAdd ? () => onAdd?.(stock) : undefined}
         />

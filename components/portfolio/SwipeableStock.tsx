@@ -12,7 +12,7 @@ interface SwipeableStockProps extends StockProps {
   onAdd?: () => void;
 }
 
-export function SwipeableStock({ symbol, shares, pricePerShare, logo, isPositive = true, onDelete, onAdd }: SwipeableStockProps) {
+export function SwipeableStock({ symbol, shares, pricePerShare, logo, isPositive = true, isStarred = false, onStarPress, onDelete, onAdd }: SwipeableStockProps) {
   const colors = usePortfolioColors();
 
   const renderRightActions = () => {
@@ -39,12 +39,17 @@ export function SwipeableStock({ symbol, shares, pricePerShare, logo, isPositive
           <Image source={logo} style={styles.logo} />
           <View style={styles.content}>
             <View style={styles.textContainer}>
-              <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]}>
+              <Text style={[Typography.bodyMedium, { color: isPositive ? colors.primaryGreen : colors.errorRed }]}>
                 {symbol} {shares} shares
               </Text>
               <Text style={[Typography.body, { color: colors.textSecondary }]}>{pricePerShare}/share</Text>
             </View>
           </View>
+          {onStarPress != null && (
+            <TouchableOpacity style={styles.starButton} onPress={onStarPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialIcons name={isStarred ? 'star' : 'star-border'} size={24} color={isStarred ? colors.primaryGreen : colors.textTertiary} />
+            </TouchableOpacity>
+          )}
         </View>
       </Swipeable>
     </GestureHandlerRootView>
@@ -91,5 +96,9 @@ const styles = StyleSheet.create({
     marginRight: Spacing.xs,
   },
   deleteButton: {},
+  starButton: {
+    padding: Spacing.sm,
+    marginLeft: Spacing.xs,
+  },
 });
 

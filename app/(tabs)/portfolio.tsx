@@ -4,11 +4,11 @@ import { StockData, StockList } from '@/components/portfolio/StockList';
 import { Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // Mock stock data - in production, this would come from an API or state management
-const stocks: StockData[] = [
+const initialStocks: StockData[] = [
   {
     symbol: 'MSFT',
     shares: 3,
@@ -41,6 +41,21 @@ const stocks: StockData[] = [
 
 export default function PortfolioScreen() {
   const colors = usePortfolioColors();
+  const [watchlistSymbols, setWatchlistSymbols] = useState<Set<string>>(new Set(['MSFT', 'NVDA']));
+
+  const toggleWatchlist = useCallback((stock: StockData) => {
+    setWatchlistSymbols((prev) => {
+      const next = new Set(prev);
+      if (next.has(stock.symbol)) next.delete(stock.symbol);
+      else next.add(stock.symbol);
+      return next;
+    });
+  }, []);
+
+  const stocksWithStarred = initialStocks.map((s) => ({
+    ...s,
+    isStarred: watchlistSymbols.has(s.symbol),
+  }));
 
   return (
     <TabScreenLayout pageTitle="Portfolio">
@@ -58,9 +73,10 @@ export default function PortfolioScreen() {
 
         {/* Stock List */}
         <StockList
-          stocks={stocks}
+          stocks={stocksWithStarred}
           onDelete={(stock) => console.log('Delete', stock.symbol)}
           onAdd={(stock) => console.log('Add', stock.symbol)}
+          onStarPress={toggleWatchlist}
         />
       </ScrollView>
     </TabScreenLayout>

@@ -10,6 +10,8 @@ export interface StockProps {
   pricePerShare: string;
   logo: ImageSourcePropType;
   isPositive?: boolean;
+  isStarred?: boolean;
+  onStarPress?: () => void;
 }
 
 export function Stock({ symbol, shares, pricePerShare, logo, isPositive = true }: StockProps) {
