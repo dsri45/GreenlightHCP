@@ -6,7 +6,7 @@
 import { Platform } from 'react-native';
 
 const tintColorLight = '#188343';
-const tintColorDark = '#2DFF54';
+const tintColorDark = '#6BB872'; // Muted green for dark mode (was #2DFF54)
 
 export const Colors = {
   light: {
@@ -28,6 +28,7 @@ export const Colors = {
     borderLight: '#E0E0E0',
     borderGrid: 'rgba(230, 230, 230, 0.5)',
     borderGridSolid: '#E6E6E6',
+    chartBackground: '#FFFFFF',
     tabBarBackground: '#69B788',
     chartGradientStart: 'rgba(45, 255, 101, 0.15)',
     chartGradientEnd: 'rgba(45, 255, 101, 0)',
@@ -42,12 +43,13 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
-    primaryGreen: '#2DFF54',
+    primaryGreen: tintColorDark,
     secondaryGreen: '#188343',
     errorRed: '#FF6B6B',
     stockCardBackground: '#F38989',
     white: '#FFFFFF',
     black: '#000000',
+    chartBackground: '#000000',
     textPrimary: '#ECEDEE',
     textSecondary: 'rgba(236, 237, 238, 0.5)',
     textTertiary: '#9BA1A6',
@@ -59,7 +61,7 @@ export const Colors = {
     chartGradientEnd: 'rgba(45, 255, 101, 0)',
     timePeriodActive: 'rgba(134, 190, 109, 0.64)',
     dotGlow: 'rgba(59, 255, 45, 0.1)',
-    greenlightBrand: '#2DFF54',
+    greenlightBrand: tintColorDark,
   },
 };
 

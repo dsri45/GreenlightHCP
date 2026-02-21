@@ -14,6 +14,15 @@ export const Typography = StyleSheet.create({
     lineHeight: 28,
     letterSpacing: -0.02,
   },
+  // Page title (used for tab page titles like "Portfolio", "Watchlist")
+  pageTitle: {
+    fontFamily: 'Inter',
+    fontStyle: 'normal',
+    fontWeight: '600',
+    fontSize: 20,
+    lineHeight: 28,
+    letterSpacing: -0.02,
+  },
   // Section titles
   sectionTitle: {
     fontFamily: 'Inter',
