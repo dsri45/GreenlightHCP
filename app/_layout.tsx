@@ -12,8 +12,7 @@ import { GasoekOne_400Regular } from '@expo-google-fonts/gasoek-one';
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
-  //changed from anchor: '(tabs)',
-  initialRouteName: 'signup',
+  initialRouteName: 'index',
 };
 
 export default function RootLayout() {
@@ -34,7 +33,8 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack initialRouteName="signup">
+      <Stack initialRouteName="index">
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
