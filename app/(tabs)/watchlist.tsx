@@ -1,5 +1,5 @@
-import { StockList, StockData } from '@/components/portfolio/StockList';
 import { TabScreenLayout } from '@/components/layouts/TabScreenLayout';
+import { StockData, StockList } from '@/components/portfolio/StockList';
 import { Spacing } from '@/constants/theme';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';

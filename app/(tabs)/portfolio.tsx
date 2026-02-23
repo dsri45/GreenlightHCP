@@ -41,6 +41,7 @@ const initialStocks: StockData[] = [
 
 export default function PortfolioScreen() {
   const colors = usePortfolioColors();
+  const [stocks, setStocks] = useState<StockData[]>(initialStocks);
   const [watchlistSymbols, setWatchlistSymbols] = useState<Set<string>>(new Set(['MSFT', 'NVDA']));
 
   const toggleWatchlist = useCallback((stock: StockData) => {
@@ -52,7 +53,16 @@ export default function PortfolioScreen() {
     });
   }, []);
 
-  const stocksWithStarred = initialStocks.map((s) => ({
+  const handleDeleteStock = useCallback((stock: StockData) => {
+    setStocks((prev) => prev.filter((s) => s.symbol !== stock.symbol));
+    setWatchlistSymbols((prev) => {
+      const next = new Set(prev);
+      next.delete(stock.symbol);
+      return next;
+    });
+  }, []);
+
+  const stocksWithStarred = stocks.map((s) => ({
     ...s,
     isStarred: watchlistSymbols.has(s.symbol),
   }));
@@ -74,7 +84,7 @@ export default function PortfolioScreen() {
         {/* Stock List */}
         <StockList
           stocks={stocksWithStarred}
-          onDelete={(stock) => console.log('Delete', stock.symbol)}
+          onDelete={handleDeleteStock}
           onAdd={(stock) => console.log('Add', stock.symbol)}
           onStarPress={toggleWatchlist}
         />
