@@ -111,7 +111,7 @@ export default function LoginScreen() {
 
           {/* Signup link */}
           <View style={styles.footer}>
-            <Text style={[Typography.body, { color: colors.textSecondary }]}>Don't have an account? </Text>
+            <Text style={[Typography.body, { color: colors.textSecondary }]}>Don&apos;t have an account? </Text>
             <Pressable onPress={() => router.push('/signup' as Href)} hitSlop={8}>
               <Text style={[Typography.bodyMedium, { color: colors.greenlightBrand }]}>Sign up</Text>
             </Pressable>

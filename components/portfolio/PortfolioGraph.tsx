@@ -1,12 +1,12 @@
 import { BorderRadius, Spacing } from '@/constants/theme';
-import { chartDataByPeriod } from '@/data/mockChartData';
+import { ChartData, chartDataByPeriod } from '@/data/mockChartData';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { useFont } from '@shopify/react-native-skia';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { CartesianChart, Line } from 'victory-native';
 import { TimePeriodButton } from './TimePeriodButton';
-import { Inter_600SemiBold } from '@expo-google-fonts/inter';
 
 const TIME_PERIODS = ['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', '2Y'];
 
@@ -14,20 +14,39 @@ const CHART_WIDTH = 311;
 const CHART_HEIGHT = 220;
 
 /** Convert period chart data to victory-native shape: { index, value }[] */
-function toCartesianData(period: string): { index: number; value: number }[] {
-  const raw = chartDataByPeriod[period] ?? chartDataByPeriod['1M'];
+function toCartesianData(period: string, dataByPeriod: Record<string, ChartData>): { index: number; value: number }[] {
+  const fallback = dataByPeriod['1M'] ?? Object.values(dataByPeriod)[0];
+  const raw = dataByPeriod[period] ?? fallback;
+  if (!raw) return [];
   const labels = raw.labels;
   const values = raw.datasets[0]?.data ?? [];
   return labels.map((_, i) => ({ index: i, value: values[i] ?? 0 }));
 }
 
-export function PortfolioGraph() {
-  const [selectedPeriod, setSelectedPeriod] = useState('1M');
+interface PortfolioGraphProps {
+  initialPeriod?: string;
+  periods?: string[];
+  dataByPeriod?: Record<string, ChartData>;
+}
+
+export function PortfolioGraph({
+  initialPeriod = '1M',
+  periods = TIME_PERIODS,
+  dataByPeriod = chartDataByPeriod,
+}: PortfolioGraphProps) {
+  const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
   const [layoutReady, setLayoutReady] = useState(false);
   const colors = usePortfolioColors();
 
-  const rawChartData = chartDataByPeriod[selectedPeriod] ?? chartDataByPeriod['1M'];
-  const data = useMemo(() => toCartesianData(selectedPeriod), [selectedPeriod]);
+  const fallbackPeriod = periods.includes(initialPeriod) ? initialPeriod : periods[0] ?? '1M';
+  const activePeriod = periods.includes(selectedPeriod) ? selectedPeriod : fallbackPeriod;
+
+  const rawChartData =
+    dataByPeriod[activePeriod] ??
+    dataByPeriod[fallbackPeriod] ??
+    dataByPeriod['1M'] ??
+    Object.values(dataByPeriod)[0] ?? { labels: [], datasets: [{ data: [] }] };
+  const data = useMemo(() => toCartesianData(activePeriod, dataByPeriod), [activePeriod, dataByPeriod]);
   const labels = rawChartData.labels;
 
   const font = useFont(Inter_600SemiBold, 12);
@@ -51,11 +70,11 @@ export function PortfolioGraph() {
   return (
     <View style={[styles.container, { backgroundColor: colors.chartBackground, borderColor: colors.borderLight }]}>
       <View style={styles.timePeriodContainer}>
-        {TIME_PERIODS.map((period) => (
+        {periods.map((period) => (
           <TimePeriodButton
             key={period}
             period={period}
-            isSelected={selectedPeriod === period}
+            isSelected={activePeriod === period}
             onPress={() => setSelectedPeriod(period)}
           />
         ))}

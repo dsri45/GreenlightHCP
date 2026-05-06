@@ -4,33 +4,31 @@ import { NewsRow } from '@/components/search/NewsRow';
 import { SearchBar } from '@/components/search/SearchBar';
 import { BorderRadius, Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
+import { buildOneYearPortfolioChartData } from '@/data/mockPortfolio';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
+import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
+import { usePortfolioNews } from '@/hooks/use-portfolio-news';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function SearchScreen() {
   const colors = usePortfolioColors();
   const [query, setQuery] = useState('');
-
-  // TEMP: mock “selected stock” + stats until backend is ready
-  const selected = useMemo(() => {
-    if (!query.trim()) return null;
-    return {
-      symbol: query.trim().toUpperCase(),
-      today: '+$3.43 today',
-      overall: 'Overall Change: -5%',
-    };
-  }, [query]);
+  const { holdings } = usePortfolioHoldings();
+  const { articles, loading: newsLoading, error: newsError, getAgeLabel } = usePortfolioNews(holdings);
+  const oneYearPortfolioData = useMemo(() => buildOneYearPortfolioChartData(holdings), [holdings]);
+  const totalPortfolioValue = useMemo(
+    () => holdings.reduce((sum, stock) => sum + stock.currentPrice * stock.shares, 0),
+    [holdings]
+  );
 
   return (
     <TabScreenLayout pageTitle="Search">
       <ScrollView contentContainerStyle={styles.scroll}>
-        <SearchBar value={query} onChangeText={setQuery} placeholder="Stock X" />
-
-        {/* Stock Graph Card */}
+        {/* Portfolio Growth Graph Card */}
         <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.borderLight }]}>
           <View style={styles.cardHeader}>
-            <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]}>1 Year Stock Graph</Text>
+            <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]}>Portfolio Growth (1Y)</Text>
 
             <TouchableOpacity
               activeOpacity={0.85}
@@ -44,45 +42,53 @@ export default function SearchScreen() {
           </View>
 
           <View style={{ marginTop: Spacing.sm }}>
-            <PortfolioGraph />
+            <PortfolioGraph initialPeriod="1Y" periods={['1Y']} dataByPeriod={{ '1Y': oneYearPortfolioData }} />
           </View>
 
-          {selected && (
-            <View style={{ marginTop: Spacing.md }}>
-              <Text style={[Typography.bodyMedium, { color: colors.primaryGreen }]}>{selected.today}</Text>
-              <Text style={[Typography.small, { color: colors.errorRed }]}>{selected.overall}</Text>
-            </View>
-          )}
+          <View style={{ marginTop: Spacing.md }}>
+            <Text style={[Typography.bodyMedium, { color: colors.primaryGreen }]}>
+              Total portfolio value: ${totalPortfolioValue.toFixed(2)}
+            </Text>
+            <Text style={[Typography.small, { color: colors.textSecondary }]}>
+              Calculated from current holdings in your portfolio.
+            </Text>
+          </View>
         </View>
+
+        <SearchBar value={query} onChangeText={setQuery} placeholder="Stock X" />
 
         {/* News List */}
         <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.borderLight }]}>
           <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]}>News</Text>
 
-          <NewsRow
-            title="The Economist"
-            ageLabel="1d"
-            logo={require('@/assets/images/icon.png')}
-            onPress={() => {}}
-          />
-          <NewsRow
-            title="Wall Street Journal"
-            ageLabel="1d"
-            logo={require('@/assets/images/icon.png')}
-            onPress={() => {}}
-          />
-          <NewsRow
-            title="Bloomberg"
-            ageLabel="2d"
-            logo={require('@/assets/images/icon.png')}
-            onPress={() => {}}
-          />
-          <NewsRow
-            title="Financial Times"
-            ageLabel="3d"
-            logo={require('@/assets/images/icon.png')}
-            onPress={() => {}}
-          />
+          {newsLoading && (
+            <Text style={[Typography.small, { color: colors.textSecondary, marginTop: Spacing.md }]}>
+              Loading portfolio news...
+            </Text>
+          )}
+
+          {!newsLoading && newsError && (
+            <Text style={[Typography.small, { color: colors.errorRed, marginTop: Spacing.md }]}>{newsError}</Text>
+          )}
+
+          {!newsLoading && !newsError && articles.length === 0 && (
+            <Text style={[Typography.small, { color: colors.textSecondary, marginTop: Spacing.md }]}>
+              No major portfolio-related developments found right now.
+            </Text>
+          )}
+
+          {!newsError &&
+            articles.map((article) => (
+              <NewsRow
+                key={article.id}
+                title={article.title}
+                ageLabel={`${article.sourceName} · ${getAgeLabel(article.publishedAt)}`}
+                logo={require('@/assets/images/icon.png')}
+                onPress={() => {
+                  void Linking.openURL(article.url);
+                }}
+              />
+            ))}
         </View>
       </ScrollView>
     </TabScreenLayout>

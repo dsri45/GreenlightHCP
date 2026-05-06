@@ -4,44 +4,13 @@ import { StockData, StockList } from '@/components/portfolio/StockList';
 import { Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
-import React, { useCallback, useState } from 'react';
+import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-
-// Mock stock data - in production, this would come from an API or state management
-const initialStocks: StockData[] = [
-  {
-    symbol: 'MSFT',
-    shares: 3,
-    pricePerShare: '$100.00',
-    logo: require('@/assets/images/icon.png'), // Replace with actual stock logos
-    isPositive: true,
-  },
-  {
-    symbol: 'NYSE: BA',
-    shares: 3,
-    pricePerShare: '$100.00',
-    logo: require('@/assets/images/icon.png'),
-    isPositive: true,
-  },
-  {
-    symbol: 'NVDA',
-    shares: 3,
-    pricePerShare: '$100.00',
-    logo: require('@/assets/images/icon.png'),
-    isPositive: false,
-  },
-  {
-    symbol: 'APPL',
-    shares: 3,
-    pricePerShare: '$100.00',
-    logo: require('@/assets/images/icon.png'),
-    isPositive: true,
-  },
-];
 
 export default function PortfolioScreen() {
   const colors = usePortfolioColors();
-  const [stocks, setStocks] = useState<StockData[]>(initialStocks);
+  const { holdings, addShare, removeHolding } = usePortfolioHoldings();
   const [watchlistSymbols, setWatchlistSymbols] = useState<Set<string>>(new Set(['MSFT', 'NVDA']));
 
   const toggleWatchlist = useCallback((stock: StockData) => {
@@ -54,13 +23,29 @@ export default function PortfolioScreen() {
   }, []);
 
   const handleDeleteStock = useCallback((stock: StockData) => {
-    setStocks((prev) => prev.filter((s) => s.symbol !== stock.symbol));
+    removeHolding(stock.symbol);
     setWatchlistSymbols((prev) => {
       const next = new Set(prev);
       next.delete(stock.symbol);
       return next;
     });
-  }, []);
+  }, [removeHolding]);
+
+  const handleAddStock = useCallback((stock: StockData) => {
+    addShare(stock.symbol);
+  }, [addShare]);
+
+  const stocks = useMemo<StockData[]>(
+    () =>
+      holdings.map((holding) => ({
+        symbol: holding.symbol,
+        shares: holding.shares,
+        pricePerShare: `$${holding.currentPrice.toFixed(2)}`,
+        logo: require('@/assets/images/icon.png'),
+        isPositive: holding.yearlyChangePct >= 0,
+      })),
+    [holdings]
+  );
 
   const stocksWithStarred = stocks.map((s) => ({
     ...s,
@@ -85,7 +70,7 @@ export default function PortfolioScreen() {
         <StockList
           stocks={stocksWithStarred}
           onDelete={handleDeleteStock}
-          onAdd={(stock) => console.log('Add', stock.symbol)}
+          onAdd={handleAddStock}
           onStarPress={toggleWatchlist}
         />
       </ScrollView>
