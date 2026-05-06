@@ -41,7 +41,7 @@ export default function SearchScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ marginTop: Spacing.sm }}>
+          <View style={styles.graphWrapper}>
             <PortfolioGraph initialPeriod="1Y" periods={['1Y']} dataByPeriod={{ '1Y': oneYearPortfolioData }} />
           </View>
 
@@ -105,6 +105,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: BorderRadius.sm,
     padding: Spacing.lg,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  graphWrapper: {
+    marginTop: Spacing.sm,
+    alignItems: 'center',
   },
   cardHeader: {
     flexDirection: 'row',

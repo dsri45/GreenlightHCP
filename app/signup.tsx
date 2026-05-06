@@ -50,7 +50,7 @@ export default function SignupScreen() {
                 styles.input,
                 {
                   backgroundColor: colors.white,
-                  color: colors.textPrimary,
+                  color: colors.black,
                   borderColor: colors.borderLight,
                 },
               ]}
@@ -66,7 +66,7 @@ export default function SignupScreen() {
                 styles.input,
                 {
                   backgroundColor: colors.white,
-                  color: colors.textPrimary,
+                  color: colors.black,
                   borderColor: colors.borderLight,
                 },
               ]}
@@ -83,7 +83,7 @@ export default function SignupScreen() {
                 styles.input,
                 {
                   backgroundColor: colors.white,
-                  color: colors.textPrimary,
+                  color: colors.black,
                   borderColor: colors.borderLight,
                 },
               ]}
@@ -98,7 +98,7 @@ export default function SignupScreen() {
                 styles.input,
                 {
                   backgroundColor: colors.white,
-                  color: colors.textPrimary,
+                  color: colors.black,
                   borderColor: colors.borderLight,
                 },
               ]}

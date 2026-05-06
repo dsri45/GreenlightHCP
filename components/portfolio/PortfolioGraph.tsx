@@ -1,19 +1,18 @@
 import { BorderRadius, Spacing } from '@/constants/theme';
 import { ChartData, chartDataByPeriod } from '@/data/mockChartData';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
-import { Inter_600SemiBold } from '@expo-google-fonts/inter';
-import { useFont } from '@shopify/react-native-skia';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { CartesianChart, Line } from 'victory-native';
+import Svg, { Line as SvgLine, Path } from 'react-native-svg';
 import { TimePeriodButton } from './TimePeriodButton';
 
 const TIME_PERIODS = ['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', '2Y'];
 
 const CHART_WIDTH = 311;
 const CHART_HEIGHT = 220;
+const CHART_PADDING = 16;
 
-/** Convert period chart data to victory-native shape: { index, value }[] */
+/** Convert period chart data to line-plot points: { index, value }[] */
 function toCartesianData(period: string, dataByPeriod: Record<string, ChartData>): { index: number; value: number }[] {
   const fallback = dataByPeriod['1M'] ?? Object.values(dataByPeriod)[0];
   const raw = dataByPeriod[period] ?? fallback;
@@ -35,37 +34,33 @@ export function PortfolioGraph({
   dataByPeriod = chartDataByPeriod,
 }: PortfolioGraphProps) {
   const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
-  const [layoutReady, setLayoutReady] = useState(false);
   const colors = usePortfolioColors();
 
   const fallbackPeriod = periods.includes(initialPeriod) ? initialPeriod : periods[0] ?? '1M';
   const activePeriod = periods.includes(selectedPeriod) ? selectedPeriod : fallbackPeriod;
 
-  const rawChartData =
-    dataByPeriod[activePeriod] ??
-    dataByPeriod[fallbackPeriod] ??
-    dataByPeriod['1M'] ??
-    Object.values(dataByPeriod)[0] ?? { labels: [], datasets: [{ data: [] }] };
   const data = useMemo(() => toCartesianData(activePeriod, dataByPeriod), [activePeriod, dataByPeriod]);
-  const labels = rawChartData.labels;
+  const chartPoints = useMemo(() => {
+    if (data.length < 2) {
+      return '';
+    }
+    const values = data.map((item) => item.value);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const range = maxValue - minValue || 1;
+    const graphWidth = CHART_WIDTH - CHART_PADDING * 2;
+    const graphHeight = CHART_HEIGHT - CHART_PADDING * 2;
 
-  const font = useFont(Inter_600SemiBold, 12);
-
-  const formatYLabel = (value: number | string) => {
-    const n = Number(value);
-    if (n >= 1000) return `${(n / 1000).toFixed(0)}K`;
-    return String(value);
-  };
-
-  const formatXLabelShort = (index: number | string) => {
-    const i = typeof index === 'number' ? index : parseInt(String(index), 10);
-    const label = labels[i];
-    if (!label || label.length <= 2) return label ?? String(i);
-    const monthMatch = label.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*(\d*)/i);
-    if (monthMatch) return `${monthMatch[1][0]}${monthMatch[2] || ''}`.slice(0, 3);
-    if (/^\d{4}$/.test(label)) return label.slice(2);
-    return label.length > 3 ? label.slice(0, 3) : label;
-  };
+    return data
+      .map((point, index) => {
+        const x =
+          CHART_PADDING + (index / Math.max(data.length - 1, 1)) * graphWidth;
+        const y =
+          CHART_PADDING + (1 - (point.value - minValue) / range) * graphHeight;
+        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+      })
+      .join(' ');
+  }, [data]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.chartBackground, borderColor: colors.borderLight }]}>
@@ -82,41 +77,28 @@ export function PortfolioGraph({
 
       <View
         style={[styles.chartContainer, { backgroundColor: colors.chartBackground }]}
-        onLayout={(e) => {
-          const { width, height } = e.nativeEvent.layout;
-          if (width > 0 && height > 0 && !layoutReady) setLayoutReady(true);
-        }}
       >
-        {layoutReady && (
-          <CartesianChart
-            data={data}
-            xKey="index"
-            yKeys={['value']}
-            padding={{ left: 8, right: 8, top: 8, bottom: 8 }}
-            axisOptions={{
-              font,
-              tickCount: { x: Math.min(data.length, 8), y: 4 },
-              lineColor: colors.borderGridSolid,
-              lineWidth: StyleSheet.hairlineWidth,
-              labelColor: colors.textPrimary,
-              formatXLabel: (v) => formatXLabelShort(v as number),
-              formatYLabel: (v) => formatYLabel(v),
-            }}
-            frame={{
-              lineColor: colors.borderGridSolid,
-              lineWidth: StyleSheet.hairlineWidth,
-            }}
-          >
-            {({ points }) => (
-              <Line
-                points={points.value}
-                color={colors.primaryGreen}
-                strokeWidth={2}
-                curveType="linear"
-              />
-            )}
-          </CartesianChart>
-        )}
+        <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+          <SvgLine
+            x1={CHART_PADDING}
+            y1={CHART_HEIGHT - CHART_PADDING}
+            x2={CHART_WIDTH - CHART_PADDING}
+            y2={CHART_HEIGHT - CHART_PADDING}
+            stroke={colors.borderGridSolid}
+            strokeWidth={StyleSheet.hairlineWidth}
+          />
+          <SvgLine
+            x1={CHART_PADDING}
+            y1={CHART_PADDING}
+            x2={CHART_PADDING}
+            y2={CHART_HEIGHT - CHART_PADDING}
+            stroke={colors.borderGridSolid}
+            strokeWidth={StyleSheet.hairlineWidth}
+          />
+          {chartPoints ? (
+            <Path d={chartPoints} stroke={colors.primaryGreen} strokeWidth={2} fill="none" />
+          ) : null}
+        </Svg>
       </View>
     </View>
   );

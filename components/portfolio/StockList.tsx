@@ -43,6 +43,7 @@ export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListPro
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.md,
+    alignItems: 'center',
   },
 });
 
