@@ -42,17 +42,15 @@ const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    paddingTop: 60,
-    paddingBottom: Spacing.lg,
+    paddingTop: 30,
+    paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.xl,
   },
   brandContainer: {
-    width: 191,
-    height: 51,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   brandText: {
     textAlign: 'center',

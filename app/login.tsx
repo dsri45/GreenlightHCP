@@ -134,12 +134,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: Spacing.xl,
-    paddingTop: 60,
+    paddingTop: 44,
     paddingBottom: Spacing.xxxl,
   },
   header: {
     alignSelf: 'center',
-    marginBottom: Spacing.xxl,
+    marginBottom: Spacing.xl,
   },
   form: {
     gap: Spacing.lg,

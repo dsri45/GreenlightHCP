@@ -23,6 +23,13 @@ export const Typography = StyleSheet.create({
     lineHeight: 28,
     letterSpacing: -0.02,
   },
+  h2Small: {
+    fontFamily: 'Inter',
+    fontStyle: 'normal',
+    fontWeight: '600',
+    fontSize: 16,
+    lineHeight: 24,
+  },
   // Section titles
   sectionTitle: {
     fontFamily: 'Inter',
@@ -68,8 +75,8 @@ export const Typography = StyleSheet.create({
     fontFamily: 'Gasoek One',
     fontStyle: 'normal',
     fontWeight: '400',
-    fontSize: 32,
-    lineHeight: 48,
+    fontSize: 26,
+    lineHeight: 34,
     letterSpacing: -0.01,
   },
 });

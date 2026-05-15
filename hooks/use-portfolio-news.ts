@@ -1,4 +1,5 @@
 import { PortfolioHolding } from '@/data/mockPortfolio';
+import { getSearchTermsForSymbol, resolveStockSearch } from '@/data/stockLookup';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const NEWS_API_BASE_URL = 'https://eventregistry.org/api/v1/article/getArticles';
@@ -18,13 +19,6 @@ const DEVELOPMENT_KEYWORDS = [
   'bankruptcy',
   'investment',
 ];
-
-const HOLDING_NAME_ALIASES: Record<string, string[]> = {
-  AAPL: ['Apple', 'Apple Inc'],
-  MSFT: ['Microsoft', 'Microsoft Corp', 'Microsoft Corporation'],
-  NVDA: ['NVIDIA', 'Nvidia', 'NVIDIA Corp', 'NVIDIA Corporation'],
-  BA: ['Boeing', 'Boeing Co', 'The Boeing Company'],
-};
 
 interface EventRegistryArticle {
   title?: string;
@@ -123,19 +117,41 @@ function parseEventRegistryArticles(payload: unknown): EventRegistryArticle[] {
   return [];
 }
 
-export function usePortfolioNews(holdings: PortfolioHolding[]) {
+export function usePortfolioNews(holdings: PortfolioHolding[], searchQuery = '') {
   const [articles, setArticles] = useState<PortfolioNewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastUpdatedAtRef = useRef<number | null>(null);
 
-  const symbols = useMemo(
-    () => holdings.map((holding) => sanitizeSymbol(holding.symbol)).filter(Boolean),
-    [holdings]
+  const trimmedQuery = searchQuery.trim();
+  const resolvedStock = useMemo(
+    () => (trimmedQuery ? resolveStockSearch(trimmedQuery, holdings) : null),
+    [trimmedQuery, holdings]
   );
+
+  const symbols = useMemo(() => {
+    if (resolvedStock) return [resolvedStock.symbol];
+    return holdings.map((holding) => sanitizeSymbol(holding.symbol)).filter(Boolean);
+  }, [holdings, resolvedStock]);
+
+  const holdingTerms = useMemo(() => {
+    if (resolvedStock) return getSearchTermsForSymbol(resolvedStock.symbol);
+    return Array.from(
+      new Set(
+        symbols.flatMap((symbol) => [symbol, ...getSearchTermsForSymbol(symbol).slice(1)])
+      )
+    );
+  }, [symbols, resolvedStock]);
 
   const fetchNews = useCallback(
     async (force = false) => {
+      if (trimmedQuery && !resolvedStock) {
+        setArticles([]);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
       if (symbols.length === 0) {
         setArticles([]);
         setError(null);
@@ -159,13 +175,8 @@ export function usePortfolioNews(holdings: PortfolioHolding[]) {
       setError(null);
 
       try {
-        const focusedSymbols = symbols.slice(0, 8);
-        const holdingTerms = Array.from(
-          new Set(
-            focusedSymbols.flatMap((symbol) => [symbol, ...(HOLDING_NAME_ALIASES[symbol] ?? [])])
-          )
-        );
         const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const isStockSearch = Boolean(resolvedStock);
         const fetchEventRegistryArticles = async ({
           keywords,
           count = 50,
@@ -238,9 +249,11 @@ export function usePortfolioNews(holdings: PortfolioHolding[]) {
                 new RegExp(`\\b${escapeRegExp(term)}\\b`, 'i').test(haystack)
               );
               const hasBusinessSignal = developmentRegex.test(haystack);
-              const passes = strictBusinessFilter
-                ? hasHoldingMatch && hasBusinessSignal && relevanceScore >= 3
-                : hasHoldingMatch && relevanceScore >= 2;
+              const passes = isStockSearch
+                ? hasHoldingMatch
+                : strictBusinessFilter
+                  ? hasHoldingMatch && hasBusinessSignal && relevanceScore >= 3
+                  : hasHoldingMatch && relevanceScore >= 2;
               return { ...article, relevanceScore, passes };
             })
             .filter((article) => article.passes)
@@ -248,11 +261,11 @@ export function usePortfolioNews(holdings: PortfolioHolding[]) {
         };
 
         const strictRaw = await fetchEventRegistryArticles({
-          keywords: [...holdingTerms, ...DEVELOPMENT_KEYWORDS],
+          keywords: isStockSearch ? holdingTerms : [...holdingTerms, ...DEVELOPMENT_KEYWORDS],
           includeBusinessSourcesOnly: true,
           count: 50,
         });
-        const strictArticles = scoreArticles(strictRaw, true);
+        const strictArticles = scoreArticles(strictRaw, !isStockSearch);
 
         let fallbackArticles: ScoredArticle[] = [];
         if (strictArticles.length < MIN_ARTICLES) {
@@ -264,7 +277,7 @@ export function usePortfolioNews(holdings: PortfolioHolding[]) {
           fallbackArticles = scoreArticles(broadRaw, false);
         }
 
-        if (strictArticles.length + fallbackArticles.length < MIN_ARTICLES) {
+        if (!isStockSearch && strictArticles.length + fallbackArticles.length < MIN_ARTICLES) {
           const queryTerms = holdingTerms.slice(0, 8);
           for (const term of queryTerms) {
             const perTermRaw = await fetchEventRegistryArticles({
@@ -299,7 +312,7 @@ export function usePortfolioNews(holdings: PortfolioHolding[]) {
         setLoading(false);
       }
     },
-    [symbols]
+    [symbols, holdingTerms, resolvedStock, trimmedQuery]
   );
 
   useEffect(() => {

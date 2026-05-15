@@ -1,8 +1,12 @@
 import { TabScreenLayout } from '@/components/layouts/TabScreenLayout';
-import { PortfolioGraph } from '@/components/portfolio';
+import { PortfolioAnalytics, PortfolioGraph } from '@/components/portfolio';
 import { StockData, StockList } from '@/components/portfolio/StockList';
 import { Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
+import {
+  buildPortfolioChartDataByPeriod,
+  computePortfolioAnalytics,
+} from '@/data/mockPortfolio';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -12,6 +16,9 @@ export default function PortfolioScreen() {
   const colors = usePortfolioColors();
   const { holdings, addShare, removeHolding } = usePortfolioHoldings();
   const [watchlistSymbols, setWatchlistSymbols] = useState<Set<string>>(new Set(['MSFT', 'NVDA']));
+
+  const chartDataByPeriod = useMemo(() => buildPortfolioChartDataByPeriod(holdings), [holdings]);
+  const analytics = useMemo(() => computePortfolioAnalytics(holdings), [holdings]);
 
   const toggleWatchlist = useCallback((stock: StockData) => {
     setWatchlistSymbols((prev) => {
@@ -58,15 +65,30 @@ export default function PortfolioScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Portfolio Graph */}
-        <View style={styles.graphContainer}>
-          <PortfolioGraph />
+        <View style={styles.dashboardRow}>
+          <View style={styles.graphColumn}>
+            <PortfolioGraph
+              compact
+              showAxes
+              showBorder={false}
+              dataByPeriod={chartDataByPeriod}
+            />
+          </View>
+          <View style={styles.analyticsColumn}>
+            <PortfolioAnalytics analytics={analytics} />
+          </View>
         </View>
 
-        {/* Your Stocks Section */}
-        <Text style={[Typography.sectionTitle, styles.sectionTitleBold, { color: colors.textPrimary, marginBottom: Spacing.md }]}>Your Stocks</Text>
+        <Text
+          style={[
+            Typography.sectionTitle,
+            styles.sectionTitleBold,
+            { color: colors.textPrimary, marginTop: Spacing.xl, marginBottom: Spacing.md },
+          ]}
+        >
+          Your Stocks
+        </Text>
 
-        {/* Stock List */}
         <StockList
           stocks={stocksWithStarred}
           onDelete={handleDeleteStock}
@@ -86,13 +108,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xxxl,
   },
-  graphContainer: {
+  dashboardRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: Spacing.md,
     marginTop: Spacing.lg,
-    marginBottom: Spacing.xl,
-    alignItems: 'center',
+    marginBottom: Spacing.md,
+    minHeight: 280,
+    width: '100%',
+  },
+  graphColumn: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+  },
+  analyticsColumn: {
+    width: 158,
+    flexShrink: 0,
+    alignSelf: 'stretch',
+    alignItems: 'flex-end',
   },
   sectionTitleBold: {
     fontWeight: '700',
   },
 });
-
