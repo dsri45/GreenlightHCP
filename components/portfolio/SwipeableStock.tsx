@@ -1,5 +1,4 @@
-import { BorderRadius, Spacing } from '@/constants/theme';
-import { Typography } from '@/constants/typography';
+import { Spacing } from '@/constants/theme';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
@@ -7,49 +6,120 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { StockProps } from './Stock';
 
+// ─── Greenlight brand palette ─────────────────────────────────────────────────
+const GL = {
+  green900: '#0A2E1A',
+  green800: '#0F4526',
+  green700: '#166534',
+  green600: '#16A34A',
+  green500: '#22C55E',
+  green400: '#4ADE80',
+  green300: '#86EFAC',
+  green200: '#BBF7D0',
+  green100: '#DCFCE7',
+  green50:  '#F0FDF4',
+  white:    '#FFFFFF',
+  dimGreen: '#6B9E7A',
+};
+
 interface SwipeableStockProps extends StockProps {
   onDelete?: () => void;
   onAdd?: () => void;
 }
 
-export function SwipeableStock({ symbol, shares, pricePerShare, logo, isPositive = true, isStarred = false, onStarPress, onDelete, onAdd }: SwipeableStockProps) {
+export function SwipeableStock({
+  symbol,
+  shares,
+  pricePerShare,
+  logo,
+  isPositive = true,
+  isStarred = false,
+  onStarPress,
+  onDelete,
+  onAdd,
+}: SwipeableStockProps) {
   const colors = usePortfolioColors();
 
-  const renderRightActions = () => {
-    return (
-      <View style={styles.rightActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.addButton, { backgroundColor: colors.primaryGreen }]}
-          onPress={onAdd}>
-          <MaterialIcons name="add-circle" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.errorRed }]}
-          onPress={onDelete}>
-          <MaterialIcons name="delete" size={24} color={colors.white} />
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  const renderRightActions = () => (
+    <View style={styles.rightActions}>
+      <TouchableOpacity
+        style={[styles.actionButton, styles.addButton]}
+        onPress={onAdd}
+        activeOpacity={0.8}
+      >
+        <MaterialIcons name="add-circle" size={20} color={GL.white} />
+        <Text style={styles.actionLabel}>Add</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.actionButton, styles.deleteButton]}
+        onPress={onDelete}
+        activeOpacity={0.8}
+      >
+        <MaterialIcons name="delete" size={20} color={GL.white} />
+        <Text style={styles.actionLabel}>Remove</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <GestureHandlerRootView>
-      <Swipeable renderRightActions={renderRightActions}>
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
         <View style={styles.container}>
-          <Image source={logo} style={styles.logo} />
-          <View style={styles.content}>
-            <View style={styles.textContainer}>
-              <Text style={[Typography.bodyMedium, { color: isPositive ? colors.primaryGreen : colors.errorRed }]}>
-                {symbol} {shares} shares
-              </Text>
-              <Text style={[Typography.body, { color: colors.textSecondary }]}>{pricePerShare}/share</Text>
-            </View>
+
+          {/* Logo */}
+          <View style={styles.logoWrapper}>
+            <Image source={logo} style={styles.logo} />
           </View>
+
+          {/* Symbol + price */}
+          <View style={styles.content}>
+            <Text style={[styles.symbol, { color: isPositive ? GL.green700 : colors.errorRed }]}>
+              {symbol}
+            </Text>
+            <Text style={styles.meta}>
+              {shares} {shares === 1 ? 'share' : 'shares'} · {pricePerShare}/share
+            </Text>
+          </View>
+
+          {/* Indicator pill */}
+          <View
+            style={[
+              styles.indicatorPill,
+              { backgroundColor: isPositive ? GL.green100 : '#FEE2E2' },
+            ]}
+          >
+            <View
+              style={[
+                styles.indicatorDot,
+                { backgroundColor: isPositive ? GL.green500 : colors.errorRed },
+              ]}
+            />
+            <Text
+              style={[
+                styles.indicatorText,
+                { color: isPositive ? GL.green700 : colors.errorRed },
+              ]}
+            >
+              {isPositive ? 'Gain' : 'Loss'}
+            </Text>
+          </View>
+
+          {/* Star */}
           {onStarPress != null && (
-            <TouchableOpacity style={styles.starButton} onPress={onStarPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialIcons name={isStarred ? 'star' : 'star-border'} size={24} color={isStarred ? colors.primaryGreen : colors.textTertiary} />
+            <TouchableOpacity
+              style={styles.starButton}
+              onPress={onStarPress}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name={isStarred ? 'star' : 'star-border'}
+                size={22}
+                color={isStarred ? GL.green500 : GL.green200}
+              />
             </TouchableOpacity>
           )}
+
         </View>
       </Swipeable>
     </GestureHandlerRootView>
@@ -57,48 +127,109 @@ export function SwipeableStock({ symbol, shares, pricePerShare, logo, isPositive
 }
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    width: '100%',
+  },
+
   container: {
-    width: 360,
-    height: 55,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: GL.green100,
     backgroundColor: 'transparent',
   },
-  logo: {
-    width: 52,
-    height: 52,
-    borderRadius: BorderRadius.lg,
-    marginRight: Spacing.lg,
+
+  // Logo
+  logoWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: GL.green50,
+    borderWidth: 1,
+    borderColor: GL.green200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
   },
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+  },
+
+  // Text
   content: {
     flex: 1,
-    justifyContent: 'center',
+    gap: 3,
+    minWidth: 0,
   },
-  textContainer: {
-    gap: Spacing.xs,
+  symbol: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
+  meta: {
+    fontSize: 12,
+    color: GL.dimGreen,
+    fontWeight: '400',
+  },
+
+  // Indicator pill
+  indicatorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  indicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  indicatorText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Star
+  starButton: {
+    padding: Spacing.sm,
+    flexShrink: 0,
+  },
+
+  // Swipe actions
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
-    justifyContent: 'flex-end',
+    paddingLeft: 8,
+    gap: 6,
   },
   actionButton: {
-    width: 60,
-    height: 55,
+    width: 64,
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: BorderRadius.sm,
-    marginLeft: Spacing.xs,
+    borderRadius: 12,
+    gap: 4,
   },
   addButton: {
-    marginRight: Spacing.xs,
+    backgroundColor: GL.green600,
   },
-  deleteButton: {},
-  starButton: {
-    padding: Spacing.sm,
-    marginLeft: Spacing.xs,
+  deleteButton: {
+    backgroundColor: '#DC2626',
+  },
+  actionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: GL.white,
+    letterSpacing: 0.3,
   },
 });
-

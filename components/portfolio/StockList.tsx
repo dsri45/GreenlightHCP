@@ -1,4 +1,3 @@
-import { Spacing } from '@/constants/theme';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { StockProps } from './Stock';
@@ -15,10 +14,6 @@ interface StockListProps {
   onStarPress?: (stock: StockData) => void;
 }
 
-/**
- * Reusable component that displays a list of swipeable stocks.
- * Accepts an array of stock data and renders them with swipe actions.
- */
 export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListProps) {
   return (
     <View style={styles.container}>
@@ -42,8 +37,6 @@ export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListPro
 
 const styles = StyleSheet.create({
   container: {
-    gap: Spacing.md,
-    //alignItems: 'center',
+    width: '100%',
   },
 });
-
