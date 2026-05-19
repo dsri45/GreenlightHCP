@@ -25,6 +25,7 @@ const GL = {
 interface SwipeableStockProps extends StockProps {
   onDelete?: () => void;
   onAdd?: () => void;
+  onPress?: () => void;
 }
 
 export function SwipeableStock({
@@ -37,6 +38,7 @@ export function SwipeableStock({
   onStarPress,
   onDelete,
   onAdd,
+  onPress,
 }: SwipeableStockProps) {
   const colors = usePortfolioColors();
 
@@ -64,7 +66,13 @@ export function SwipeableStock({
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
       <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
-        <View style={styles.container}>
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.75}
+          disabled={!onPress}
+          style={styles.touchable}
+        >
+          <View style={styles.container}>
 
           {/* Logo */}
           <View style={styles.logoWrapper}>
@@ -120,7 +128,8 @@ export function SwipeableStock({
             </TouchableOpacity>
           )}
 
-        </View>
+          </View>
+        </TouchableOpacity>
       </Swipeable>
     </GestureHandlerRootView>
   );
@@ -197,6 +206,9 @@ const styles = StyleSheet.create({
   indicatorText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  touchable: {
+    width: '100%',
   },
 
   // Star

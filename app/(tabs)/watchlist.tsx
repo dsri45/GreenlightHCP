@@ -1,8 +1,19 @@
 import { TabScreenLayout } from '@/components/layouts/TabScreenLayout';
 import { StockData, StockList } from '@/components/portfolio/StockList';
 import { Spacing } from '@/constants/theme';
+import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
+import { useWatchlist } from '@/hooks/use-watchlist';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 // ─── Greenlight brand palette ─────────────────────────────────────────────────
 const GL = {
@@ -20,27 +31,92 @@ const GL = {
   dimGreen: '#6B9E7A',
 };
 
-// ─── Fake data ────────────────────────────────────────────────────────────────
-const initialWatchlistStocks: StockData[] = [
-  { id: '1', symbol: 'AAPL', shares: 0, pricePerShare: '$175.50', logo: require('@/assets/images/icon.png'), isPositive: true },
-  { id: '2', symbol: 'GOOGL', shares: 0, pricePerShare: '$142.30', logo: require('@/assets/images/icon.png'), isPositive: false },
-  { id: '3', symbol: 'AMZN', shares: 0, pricePerShare: '$155.75', logo: require('@/assets/images/icon.png'), isPositive: true },
-  { id: '4', symbol: 'TSLA', shares: 0, pricePerShare: '$248.90', logo: require('@/assets/images/icon.png'), isPositive: false },
-  { id: '5', symbol: 'META', shares: 0, pricePerShare: '$485.20', logo: require('@/assets/images/icon.png'), isPositive: true },
-];
-
 export default function WatchlistScreen() {
-  const [stocks, setStocks] = useState<StockData[]>(initialWatchlistStocks);
+  const { watchlist, removeFromWatchlist } = useWatchlist();
+  const { holdings, buyShares, sellShares } = usePortfolioHoldings();
+  const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
+  const [quantity, setQuantity] = useState('1');
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const removeFromWatchlist = useCallback((stock: StockData) => {
-    setStocks((prev) => prev.filter((s) => (s.id ?? s.symbol) !== (stock.id ?? stock.symbol)));
-  }, []);
+  const watchlistWithStarred = watchlist.map((s: StockData) => {
+    const holding = holdings.find((holding) => holding.symbol === s.symbol);
+    return {
+      ...s,
+      isStarred: true,
+      shares: holding?.shares ?? s.shares,
+      pricePerShare: holding ? `$${holding.currentPrice.toFixed(2)}` : s.pricePerShare,
+      currentPrice: holding?.currentPrice ?? s.currentPrice,
+      yearlyChangePct: holding?.yearlyChangePct ?? s.yearlyChangePct,
+    };
+  });
 
-  const watchlistWithStarred = stocks.map((s) => ({ ...s, isStarred: true }));
+  const selectedHolding = selectedStock
+    ? holdings.find((holding) => holding.symbol === selectedStock.symbol)
+    : undefined;
+
+  const selectedShares = selectedHolding?.shares ?? 0;
 
   // Derived stats
-  const positiveCount = useMemo(() => stocks.filter((s) => s.isPositive).length, [stocks]);
-  const negativeCount = useMemo(() => stocks.filter((s) => !s.isPositive).length, [stocks]);
+  const positiveCount = useMemo(
+    () => watchlist.filter((s: StockData) => s.isPositive).length,
+    [watchlist]
+  );
+  const negativeCount = useMemo(
+    () => watchlist.filter((s: StockData) => !s.isPositive).length,
+    [watchlist]
+  );
+
+  const openStockModal = useCallback((stock: StockData) => {
+    setSelectedStock(stock);
+    setQuantity('1');
+    setActionError(null);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setSelectedStock(null);
+    setQuantity('1');
+    setActionError(null);
+  }, []);
+
+  const parsePricePerShare = (priceString: string) => {
+    const sanitized = priceString.replace(/[^0-9.]/g, '');
+    const parsed = parseFloat(sanitized);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const parsedQuantity = parseInt(quantity, 10);
+
+  const handleBuyShares = useCallback(() => {
+    if (!selectedStock) return;
+    if (Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      setActionError('Enter a valid share quantity');
+      return;
+    }
+
+    buyShares(
+      selectedStock.symbol,
+      parsedQuantity,
+      selectedStock.currentPrice ?? parsePricePerShare(selectedStock.pricePerShare),
+      selectedStock.yearlyChangePct ?? 0,
+    );
+
+    closeModal();
+  }, [buyShares, closeModal, parsePricePerShare, parsedQuantity, selectedStock]);
+
+  const handleSellShares = useCallback(() => {
+    if (!selectedStock || !selectedHolding) return;
+    if (Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      setActionError('Enter a valid share quantity');
+      return;
+    }
+    if (parsedQuantity > selectedHolding.shares) {
+      setActionError(`You only have ${selectedHolding.shares} shares to sell`);
+      return;
+    }
+
+    sellShares(selectedStock.symbol, parsedQuantity);
+    closeModal();
+  }, [closeModal, parsedQuantity, sellShares, selectedHolding, selectedStock]);
 
   return (
     <TabScreenLayout pageTitle="Watchlist">
@@ -56,7 +132,7 @@ export default function WatchlistScreen() {
           {/* Total watching — dark tile */}
           <View style={[styles.statTile, styles.statTileDark]}>
             <Text style={[styles.statLabel, { color: GL.green400 }]}>Watching</Text>
-            <Text style={[styles.statValue, { color: GL.white }]}>{stocks.length}</Text>
+            <Text style={[styles.statValue, { color: GL.white }]}>{watchlist.length}</Text>
             <Text style={[styles.statSub, { color: GL.dimGreen }]}>Stocks tracked</Text>
           </View>
 
@@ -68,7 +144,7 @@ export default function WatchlistScreen() {
           </View>
 
           {/* Down — muted tile */}
-          <View style={[styles.statTile, styles.startTileDark]}>
+          <View style={[styles.statTile, styles.statTileDark]}>
             <Text style={[styles.statLabel, { color: GL.green400 }]}>Declining</Text>
             <Text style={[styles.statValue, { color: GL.white }]}>{negativeCount}</Text>
             <Text style={[styles.statSub, { color: GL.dimGreen }]}>In the red</Text>
@@ -77,7 +153,7 @@ export default function WatchlistScreen() {
         </View>
 
         {/* ── Section header ───────────────────────────────────────────────── */}
-        {stocks.length > 0 && (
+        {watchlist.length > 0 && (
           <View style={styles.sectionHeader}>
             <View style={styles.sectionPip} />
             <Text style={styles.sectionTitle}>Starred Stocks</Text>
@@ -85,7 +161,7 @@ export default function WatchlistScreen() {
         )}
 
         {/* ── Empty state ──────────────────────────────────────────────────── */}
-        {stocks.length === 0 && (
+        {watchlist.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyGlyph}>☆</Text>
             <Text style={styles.emptyTitle}>Nothing here yet</Text>
@@ -96,18 +172,63 @@ export default function WatchlistScreen() {
         )}
 
         {/* ── Stock list ───────────────────────────────────────────────────── */}
-        {stocks.length > 0 && (
+        {watchlist.length > 0 && (
           <View style={styles.stockListWrapper}>
             <StockList
               stocks={watchlistWithStarred}
               onDelete={removeFromWatchlist}
-              onAdd={(stock) => console.log('Add to portfolio', stock.symbol)}
               onStarPress={removeFromWatchlist}
+              onPress={openStockModal}
             />
           </View>
         )}
 
       </ScrollView>
+
+      <Modal visible={Boolean(selectedStock)} transparent animationType="fade" onRequestClose={closeModal}>
+        <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+          <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.modalTitle}>{selectedStock ? `Trade ${selectedStock.symbol}` : 'Trade stock'}</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedStock?.symbol && selectedHolding?.shares
+                ? `You currently hold ${selectedHolding.shares} shares.`
+                : selectedStock
+                ? 'Enter a quantity to buy.'
+                : ''}
+            </Text>
+
+            <TextInput
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+              placeholder="Number of shares"
+              placeholderTextColor={GL.green300}
+              style={styles.modalInput}
+            />
+
+            {actionError ? <Text style={styles.modalError}>{actionError}</Text> : null}
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                onPress={handleBuyShares}
+                style={[styles.modalButton, styles.buyButton]}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalButtonText}>Buy</Text>
+              </TouchableOpacity>
+              {selectedHolding?.shares ? (
+                <TouchableOpacity
+                  onPress={handleSellShares}
+                  style={[styles.modalButton, styles.sellButton]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalButtonText}>Sell</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </TabScreenLayout>
   );
 }
@@ -184,6 +305,69 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: GL.green400,
+  },
+
+  // ── Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: GL.white,
+    borderRadius: 20,
+    padding: Spacing.xl,
+    borderWidth: 1,
+    borderColor: GL.green100,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: GL.green900,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: GL.dimGreen,
+    marginBottom: Spacing.md,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: GL.green200,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: GL.green900,
+    marginBottom: Spacing.sm,
+  },
+  modalError: {
+    color: '#B91C1C',
+    fontSize: 12,
+    marginBottom: Spacing.sm,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+    marginTop: Spacing.sm,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  buyButton: {
+    backgroundColor: GL.green600,
+  },
+  sellButton: {
+    backgroundColor: '#DC2626',
+  },
+  modalButtonText: {
+    color: GL.white,
+    fontWeight: '700',
   },
 
   // ── Stock list wrapper ────────────────────────────────────────────────────

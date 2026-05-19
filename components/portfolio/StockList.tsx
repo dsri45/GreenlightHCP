@@ -12,9 +12,10 @@ interface StockListProps {
   onDelete?: (stock: StockData) => void;
   onAdd?: (stock: StockData) => void;
   onStarPress?: (stock: StockData) => void;
+  onPress?: (stock: StockData) => void;
 }
 
-export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListProps) {
+export function StockList({ stocks, onDelete, onAdd, onStarPress, onPress }: StockListProps) {
   return (
     <View style={styles.container}>
       {stocks.map((stock, index) => (
@@ -26,6 +27,7 @@ export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListPro
           logo={stock.logo}
           isPositive={stock.isPositive}
           isStarred={stock.isStarred}
+          onPress={onPress ? () => onPress?.(stock) : undefined}
           onStarPress={onStarPress ? () => onStarPress?.(stock) : undefined}
           onDelete={onDelete ? () => onDelete?.(stock) : undefined}
           onAdd={onAdd ? () => onAdd?.(stock) : undefined}

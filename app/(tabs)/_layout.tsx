@@ -7,14 +7,16 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PortfolioHoldingsProvider } from '@/hooks/use-portfolio-holdings';
+import { WatchlistProvider } from '@/hooks/use-watchlist';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
     <PortfolioHoldingsProvider>
-      <Tabs
-        screenOptions={{
+      <WatchlistProvider>
+        <Tabs
+          screenOptions={{
           tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
           headerShown: false,
           tabBarButton: HapticTab,
@@ -62,6 +64,7 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
+      </WatchlistProvider>
     </PortfolioHoldingsProvider>
   );
 }

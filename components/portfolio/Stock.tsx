@@ -1,6 +1,13 @@
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import React from 'react';
-import { Image, ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  ImageSourcePropType,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 const GL = {
   green900: '#0A2E1A',
@@ -12,8 +19,8 @@ const GL = {
   green300: '#86EFAC',
   green200: '#BBF7D0',
   green100: '#DCFCE7',
-  green50:  '#F0FDF4',
-  white:    '#FFFFFF',
+  green50: '#F0FDF4',
+  white: '#FFFFFF',
   dimGreen: '#6B9E7A',
 };
 
@@ -25,6 +32,9 @@ export interface StockProps {
   isPositive?: boolean;
   isStarred?: boolean;
   onStarPress?: () => void;
+  onPress?: () => void;
+  currentPrice?: number;
+  yearlyChangePct?: number;
 }
 
 export function Stock({
@@ -35,66 +45,72 @@ export function Stock({
   isPositive = true,
   isStarred = false,
   onStarPress,
+  onPress, // <-- FIXED: this was missing
 }: StockProps) {
   const colors = usePortfolioColors();
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.72}
+      disabled={!onPress}
+      style={styles.touchable}
+    >
+      <View style={styles.container}>
+        {/* Left: logo */}
+        <View style={styles.logoWrapper}>
+          <Image source={logo} style={styles.logo} />
+        </View>
 
-      {/* Left: logo */}
-      <View style={styles.logoWrapper}>
-        <Image source={logo} style={styles.logo} />
-      </View>
-
-      {/* Center: symbol + price */}
-      <View style={styles.content}>
-        <Text style={[styles.symbol, { color: isPositive ? GL.green700 : colors.errorRed }]}>
-          {symbol}
-        </Text>
-        <Text style={styles.shares}>
-          {shares} {shares === 1 ? 'share' : 'shares'} · {pricePerShare}/share
-        </Text>
-      </View>
-
-      {/* Right: positive/negative indicator pill + optional star */}
-      <View style={styles.rightSection}>
-        <View
-          style={[
-            styles.indicatorPill,
-            { backgroundColor: isPositive ? GL.green100 : '#FEE2E2' },
-          ]}
-        >
-          <View
-            style={[
-              styles.indicatorDot,
-              { backgroundColor: isPositive ? GL.green500 : colors.errorRed },
-            ]}
-          />
-          <Text
-            style={[
-              styles.indicatorText,
-              { color: isPositive ? GL.green700 : colors.errorRed },
-            ]}
-          >
-            {isPositive ? 'Gain' : 'Loss'}
+        {/* Center: symbol + price */}
+        <View style={styles.content}>
+          <Text style={[styles.symbol, { color: isPositive ? GL.green700 : colors.errorRed }]}>
+            {symbol}
+          </Text>
+          <Text style={styles.shares}>
+            {shares} {shares === 1 ? 'share' : 'shares'} · {pricePerShare}/share
           </Text>
         </View>
 
-        {onStarPress && (
-          <TouchableOpacity
-            onPress={onStarPress}
-            hitSlop={8}
-            style={styles.starButton}
-            activeOpacity={0.7}
+        {/* Right: indicator + star */}
+        <View style={styles.rightSection}>
+          <View
+            style={[
+              styles.indicatorPill,
+              { backgroundColor: isPositive ? GL.green100 : '#FEE2E2' },
+            ]}
           >
-            <Text style={[styles.starGlyph, { color: isStarred ? GL.green500 : GL.green200 }]}>
-              {isStarred ? '★' : '☆'}
+            <View
+              style={[
+                styles.indicatorDot,
+                { backgroundColor: isPositive ? GL.green500 : colors.errorRed },
+              ]}
+            />
+            <Text
+              style={[
+                styles.indicatorText,
+                { color: isPositive ? GL.green700 : colors.errorRed },
+              ]}
+            >
+              {isPositive ? 'Gain' : 'Loss'}
             </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          </View>
 
-    </View>
+          {onStarPress && (
+            <TouchableOpacity
+              onPress={onStarPress}
+              hitSlop={8}
+              style={styles.starButton}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.starGlyph, { color: isStarred ? GL.green500 : GL.green200 }]}>
+                {isStarred ? '★' : '☆'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -109,7 +125,6 @@ const styles = StyleSheet.create({
     borderBottomColor: GL.green100,
   },
 
-  // Logo
   logoWrapper: {
     width: 44,
     height: 44,
@@ -128,7 +143,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
 
-  // Text
   content: {
     flex: 1,
     gap: 3,
@@ -145,7 +159,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
 
-  // Right side
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,7 +183,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Star
+  touchable: {
+    width: '100%',
+  },
   starButton: {
     alignItems: 'center',
     justifyContent: 'center',

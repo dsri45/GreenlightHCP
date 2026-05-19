@@ -5,10 +5,11 @@ import { PredictionModal } from '@/components/search/PredictionModal';
 import { SearchBar } from '@/components/search/SearchBar';
 import { Spacing } from '@/constants/theme';
 import { buildOneYearPortfolioChartData, buildOneYearStockChartData } from '@/data/mockPortfolio';
-import { useResolvedStock } from '@/hooks/use-resolved-stock';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
 import { usePortfolioNews } from '@/hooks/use-portfolio-news';
+import { useResolvedStock } from '@/hooks/use-resolved-stock';
+import { useWatchlist } from '@/hooks/use-watchlist';
 import { fetchStockPrediction, StockPrediction } from '@/services/claude-prediction';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -41,6 +42,7 @@ export default function SearchScreen() {
   const [predictionError, setPredictionError] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<StockPrediction | null>(null);
   const { holdings } = usePortfolioHoldings();
+  const { isWatched, toggleWatchlist } = useWatchlist();
 
   const trimmedQuery = query.trim();
   const { stock: resolvedStock, loading: searchLoading, source: searchSource } = useResolvedStock(trimmedQuery, holdings);
@@ -88,6 +90,16 @@ export default function SearchScreen() {
   const secondaryMetricLabel = isStockSearch ? 'Ticker' : 'Holdings';
   const secondaryMetricValue = isStockSearch ? resolvedStock!.symbol : `${holdings.length}`;
   const secondaryMetricSub = isStockSearch ? resolvedStock!.displayName : 'Active positions';
+
+  const stockIsWatched = isStockSearch ? isWatched(resolvedStock!.symbol) : false;
+  const handleToggleWatchlist = useCallback(() => {
+    if (!isStockSearch) return;
+    toggleWatchlist({
+      symbol: resolvedStock!.symbol,
+      currentPrice: resolvedStock!.currentPrice,
+      yearlyChangePct: resolvedStock!.yearlyChangePct,
+    });
+  }, [isStockSearch, resolvedStock, toggleWatchlist]);
 
   const newsSectionTitle = isStockSearch
     ? `${resolvedStock!.displayName} News`
@@ -192,7 +204,23 @@ export default function SearchScreen() {
 
             {/* Row 2: chart tile — full width, mid-green */}
             <View style={[styles.tile, styles.tileMid, styles.tileWide]}>
-              <Text style={styles.chartTileTitle}>{graphTitle}</Text>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTileTitle}>{graphTitle}</Text>
+                {isStockSearch && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleToggleWatchlist}
+                    style={[
+                      styles.watchlistButton,
+                      stockIsWatched ? styles.watchlistButtonActive : styles.watchlistButtonInactive,
+                    ]}
+                  >
+                    <Text style={[styles.watchlistButtonText, stockIsWatched && styles.watchlistButtonTextActive]}>
+                      {stockIsWatched ? '★ Watching' : '☆ Add to watchlist'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.graphWrapper}>
                 <PortfolioGraph
                   initialPeriod="1Y"
@@ -412,13 +440,41 @@ const styles = StyleSheet.create({
   },
 
   // Chart tile
+  chartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 14,
+  },
   chartTileTitle: {
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: GL.green700,
-    marginBottom: 8,
+  },
+  watchlistButton: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+  },
+  watchlistButtonInactive: {
+    borderColor: GL.green200,
+    backgroundColor: GL.white,
+  },
+  watchlistButtonActive: {
+    borderColor: GL.green500,
+    backgroundColor: GL.green100,
+  },
+  watchlistButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: GL.green700,
+  },
+  watchlistButtonTextActive: {
+    color: GL.green900,
   },
   graphWrapper: {
     width: '100%',

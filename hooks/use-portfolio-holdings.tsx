@@ -1,4 +1,4 @@
-import { PortfolioHolding, mockPortfolioHoldings } from '@/data/mockPortfolio';
+import { mockPortfolioHoldings, PortfolioHolding } from '@/data/mockPortfolio';
 import { fetchStockQuotes } from '@/services/finnhub-stocks';
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
@@ -6,6 +6,8 @@ interface PortfolioHoldingsContextValue {
   holdings: PortfolioHolding[];
   addShare: (symbol: string) => void;
   removeHolding: (symbol: string) => void;
+  buyShares: (symbol: string, count: number, currentPrice: number, yearlyChangePct: number) => void;
+  sellShares: (symbol: string, count: number) => void;
 }
 
 const PortfolioHoldingsContext = createContext<PortfolioHoldingsContextValue | undefined>(undefined);
@@ -46,6 +48,39 @@ export function PortfolioHoldingsProvider({ children }: { children: ReactNode })
       },
       removeHolding: (symbol: string) => {
         setHoldings((prev) => prev.filter((holding) => holding.symbol !== symbol));
+      },
+      buyShares: (symbol: string, count: number, currentPrice: number, yearlyChangePct: number) => {
+        if (count <= 0) return;
+        const normalizedSymbol = symbol.trim().toUpperCase();
+        setHoldings((prev) => {
+          const existing = prev.find((holding) => holding.symbol === normalizedSymbol);
+          if (existing) {
+            return prev.map((holding) =>
+              holding.symbol === normalizedSymbol
+                ? {
+                    ...holding,
+                    shares: holding.shares + count,
+                    currentPrice,
+                    yearlyChangePct,
+                  }
+                : holding
+            );
+          }
+          return [...prev, { symbol: normalizedSymbol, shares: count, currentPrice, yearlyChangePct }];
+        });
+      },
+      sellShares: (symbol: string, count: number) => {
+        if (count <= 0) return;
+        const normalizedSymbol = symbol.trim().toUpperCase();
+        setHoldings((prev) =>
+          prev.flatMap((holding) => {
+            if (holding.symbol !== normalizedSymbol) {
+              return holding;
+            }
+            const remainingShares = holding.shares - count;
+            return remainingShares > 0 ? [{ ...holding, shares: remainingShares }] : [];
+          })
+        );
       },
     }),
     [holdings]
