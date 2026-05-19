@@ -1,19 +1,34 @@
-import { BorderRadius, Spacing } from '@/constants/theme';
-import { Typography } from '@/constants/typography';
+import { Spacing } from '@/constants/theme';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import { Href, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// ─── Greenlight brand palette ─────────────────────────────────────────────────
+const GL = {
+  green900: '#0A2E1A',
+  green800: '#0F4526',
+  green700: '#166534',
+  green600: '#16A34A',
+  green500: '#22C55E',
+  green400: '#4ADE80',
+  green300: '#86EFAC',
+  green200: '#BBF7D0',
+  green100: '#DCFCE7',
+  green50:  '#F0FDF4',
+  white:    '#FFFFFF',
+  dimGreen: '#6B9E7A',
+};
 
 export default function LoginScreen() {
   const colors = usePortfolioColors();
@@ -30,98 +45,123 @@ export default function LoginScreen() {
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-          {/* Header */}
+          keyboardShouldPersistTaps="handled"
+        >
+
+          {/* ── Brand header ────────────────────────────────────────────── */}
           <View style={styles.header}>
-            <Text style={[Typography.brand, { color: colors.greenlightBrand }]}>Greenlight</Text>
+            <View style={styles.headerPipRow}>
+              <View style={styles.headerPip} />
+            </View>
+            <Text style={styles.brandName}>Greenlight</Text>
+            <Text style={styles.brandTagline}>Welcome back.</Text>
           </View>
 
-          {/* Form */}
-          <View style={styles.form}>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.white,
-                  color: colors.textPrimary,
-                  borderColor: colors.borderLight,
-                },
-              ]}
-              placeholder="Email"
-              placeholderTextColor={colors.textTertiary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.white,
-                  color: colors.textPrimary,
-                  borderColor: colors.borderLight,
-                },
-              ]}
-              placeholder="Password"
-              placeholderTextColor={colors.textTertiary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
+          {/* ── Form tile ───────────────────────────────────────────────── */}
+          <View style={styles.formTile}>
 
+            <View style={styles.formTileLabel}>
+              <View style={styles.sectionPip} />
+              <Text style={styles.sectionTitle}>Log in to your account</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.black }]}
+                  placeholder="you@example.com"
+                  placeholderTextColor={GL.dimGreen}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.inputDivider} />
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.black }]}
+                  placeholder="Your password"
+                  placeholderTextColor={GL.dimGreen}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            {/* CTA */}
             <Pressable
-              style={[styles.continueButton, { backgroundColor: colors.greenlightBrand }]}
-              onPress={handleContinue}>
-              <Text style={[Typography.button, styles.continueButtonText]}>Continue</Text>
+              style={({ pressed }) => [
+                styles.continueButton,
+                pressed && styles.continueButtonPressed,
+              ]}
+              onPress={handleContinue}
+            >
+              <Text style={styles.continueButtonText}>Continue</Text>
             </Pressable>
 
-            <Text style={[Typography.small, styles.terms, { color: colors.textSecondary }]}>
+            <Text style={styles.terms}>
               By continuing, you agree to our Terms of Service and Privacy Policy.
             </Text>
           </View>
 
-          {/* Divider */}
+          {/* ── Divider ─────────────────────────────────────────────────── */}
           <View style={styles.dividerRow}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.borderLight }]} />
-            <Text style={[Typography.body, styles.orText, { color: colors.textTertiary }]}>or</Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.borderLight }]} />
+            <View style={styles.dividerLine} />
+            <Text style={styles.orText}>or</Text>
+            <View style={styles.dividerLine} />
           </View>
 
-          {/* Social login */}
+          {/* ── Social login ─────────────────────────────────────────────── */}
           <View style={styles.socialRow}>
             <Pressable
-              style={[styles.socialButton, { backgroundColor: colors.white, borderColor: colors.borderLight }]}
-              onPress={() => {}}>
-              <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]}>Apple</Text>
+              style={({ pressed }) => [
+                styles.socialButton,
+                pressed && styles.socialButtonPressed,
+              ]}
+              onPress={() => {}}
+            >
+              <Text style={styles.socialButtonText}>🍎  Apple</Text>
             </Pressable>
             <Pressable
-              style={[styles.socialButton, { backgroundColor: colors.white, borderColor: colors.borderLight }]}
-              onPress={() => {}}>
-              <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]}>Google</Text>
+              style={({ pressed }) => [
+                styles.socialButton,
+                pressed && styles.socialButtonPressed,
+              ]}
+              onPress={() => {}}
+            >
+              <Text style={styles.socialButtonText}>G  Google</Text>
             </Pressable>
           </View>
 
-          {/* Signup link */}
+          {/* ── Signup link ──────────────────────────────────────────────── */}
           <View style={styles.footer}>
-            <Text style={[Typography.body, { color: colors.textSecondary }]}>Don&apos;t have an account? </Text>
+            <Text style={styles.footerText}>Don&apos;t have an account? </Text>
             <Pressable onPress={() => router.push('/signup' as Href)} hitSlop={8}>
-              <Text style={[Typography.bodyMedium, { color: colors.greenlightBrand }]}>Sign up</Text>
+              <Text style={styles.footerLink}>Sign up</Text>
             </Pressable>
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -134,67 +174,186 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: Spacing.xl,
-    paddingTop: 44,
+    paddingTop: 52,
     paddingBottom: Spacing.xxxl,
+    gap: 0,
   },
+
+  // ── Header ──────────────────────────────────────────────────────────────
   header: {
-    alignSelf: 'center',
-    marginBottom: Spacing.xl,
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  form: {
-    gap: Spacing.lg,
+  headerPipRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  headerPip: {
+    width: 32,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: GL.green500,
+  },
+  brandName: {
+    color: GL.green700,
+    fontSize: 34,
+    fontWeight: '700',
+    letterSpacing: -1,
+    marginBottom: 6,
+  },
+  brandTagline: {
+    fontSize: 14,
+    color: GL.dimGreen,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+  },
+
+  // ── Form tile ────────────────────────────────────────────────────────────
+  formTile: {
+    backgroundColor: GL.green50,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: GL.green200,
+    padding: 20,
+  },
+  formTileLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  sectionPip: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: GL.green500,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: GL.green800,
+  },
+
+  // Stacked input group
+  inputGroup: {
+    backgroundColor: GL.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: GL.green200,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: GL.green800,
+    width: 68,
   },
   input: {
-    height: 48,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.xl,
-    ...Typography.body,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '400',
   },
+  inputDivider: {
+    height: 1,
+    backgroundColor: GL.green100,
+    marginHorizontal: 16,
+  },
+
+  // CTA button
   continueButton: {
-    height: 48,
-    borderRadius: BorderRadius.sm,
+    backgroundColor: GL.green600,
+    height: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.sm,
+    marginBottom: 14,
+  },
+  continueButtonPressed: {
+    backgroundColor: GL.green700,
   },
   continueButtonText: {
-    color: '#FFFFFF',
+    color: GL.white,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   terms: {
+    fontSize: 12,
+    color: GL.dimGreen,
     textAlign: 'center',
-    marginTop: Spacing.md,
+    lineHeight: 17,
     paddingHorizontal: Spacing.lg,
   },
+
+  // ── Divider ──────────────────────────────────────────────────────────────
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xxl,
-    marginBottom: Spacing.xl,
+    marginTop: 28,
+    marginBottom: 20,
   },
   dividerLine: {
     flex: 1,
     height: 1,
+    backgroundColor: GL.green200,
   },
   orText: {
-    marginHorizontal: Spacing.lg,
+    marginHorizontal: 14,
+    fontSize: 13,
+    color: GL.dimGreen,
+    fontWeight: '500',
   },
+
+  // ── Social buttons ───────────────────────────────────────────────────────
   socialRow: {
     flexDirection: 'row',
-    gap: Spacing.lg,
+    gap: 10,
   },
   socialButton: {
     flex: 1,
-    height: 48,
-    borderRadius: BorderRadius.sm,
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
+    borderColor: GL.green200,
+    backgroundColor: GL.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  socialButtonPressed: {
+    backgroundColor: GL.green50,
+  },
+  socialButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: GL.green900,
+    letterSpacing: 0.1,
+  },
+
+  // ── Footer ───────────────────────────────────────────────────────────────
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.xxl,
+    marginTop: 28,
+  },
+  footerText: {
+    fontSize: 14,
+    color: GL.dimGreen,
+  },
+  footerLink: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: GL.green600,
   },
 });

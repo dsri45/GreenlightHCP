@@ -1,9 +1,23 @@
 import { Spacing } from '@/constants/theme';
-import { Typography } from '@/constants/typography';
 import { PortfolioAnalyticsSummary } from '@/data/mockPortfolio';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+
+const GL = {
+  green900: '#0A2E1A',
+  green800: '#0F4526',
+  green700: '#166534',
+  green600: '#16A34A',
+  green500: '#22C55E',
+  green400: '#4ADE80',
+  green300: '#86EFAC',
+  green200: '#BBF7D0',
+  green100: '#DCFCE7',
+  green50:  '#F0FDF4',
+  white:    '#FFFFFF',
+  dimGreen: '#6B9E7A',
+};
 
 interface PortfolioAnalyticsProps {
   analytics: PortfolioAnalyticsSummary;
@@ -27,15 +41,10 @@ function AnalyticsRow({
   value: string;
   valueColor?: string;
 }) {
-  const colors = usePortfolioColors();
-
   return (
     <View style={styles.row}>
-      <Text style={[Typography.bodyMedium, styles.label, { color: colors.textSecondary }]}>{label}</Text>
-      <Text
-        style={[Typography.bodyMedium, styles.value, { color: valueColor ?? colors.textPrimary }]}
-        numberOfLines={2}
-      >
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowValue, { color: valueColor ?? GL.green600 }]} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -48,29 +57,46 @@ export function PortfolioAnalytics({ analytics }: PortfolioAnalyticsProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={[Typography.h2Small, styles.title, { color: colors.textPrimary }]}>
-        Portfolio Analytics
-      </Text>
 
-      <AnalyticsRow label="Starting value" value={formatCurrency(analytics.startingAmount)} />
-      <AnalyticsRow label="Current value" value={formatCurrency(analytics.currentAmount)} />
+      {/* Section pip + label */}
+      <View style={styles.header}>
+        <View style={styles.headerPip} />
+        <Text style={styles.headerLabel}>Analytics</Text>
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
+
       <AnalyticsRow
-        label="Total gain/loss"
+        label="Start"
+        value={formatCurrency(analytics.startingAmount)}
+      />
+      <AnalyticsRow
+        label="Current"
+        value={formatCurrency(analytics.currentAmount)}
+      />
+
+      <View style={styles.divider} />
+
+      <AnalyticsRow
+        label="Gain/loss"
         value={`${formatGain(analytics.totalGainLoss)} (${gainPositive ? '+' : ''}${analytics.totalGainLossPct.toFixed(1)}%)`}
-        valueColor={gainPositive ? colors.primaryGreen : colors.errorRed}
+        valueColor={gainPositive ? GL.green600 : colors.errorRed}
       />
+
+      <View style={styles.divider} />
+
       <AnalyticsRow
-        label="Most profitable"
+        label="Best"
         value={`${analytics.mostProfitable.symbol} ${formatGain(analytics.mostProfitable.gain)}`}
-        valueColor={colors.primaryGreen}
+        valueColor={GL.green600}
       />
       <AnalyticsRow
-        label="Least profitable"
+        label="Worst"
         value={`${analytics.leastProfitable.symbol} ${formatGain(analytics.leastProfitable.gain)}`}
-        valueColor={
-          analytics.leastProfitable.gain >= 0 ? colors.primaryGreen : colors.errorRed
-        }
+        valueColor={analytics.leastProfitable.gain >= 0 ? GL.green600 : colors.errorRed}
       />
+
     </View>
   );
 }
@@ -78,25 +104,63 @@ export function PortfolioAnalytics({ analytics }: PortfolioAnalyticsProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    paddingVertical: Spacing.xs,
-    paddingLeft: Spacing.sm,
+    backgroundColor: GL.green900,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     gap: Spacing.sm,
     alignItems: 'flex-end',
   },
-  title: {
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-    textAlign: 'right',
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    width: '100%',
+    marginBottom: 2,
   },
+  headerPip: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: GL.green500,
+  },
+  headerLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: GL.green400,
+  },
+
+  // Divider
+  divider: {
+    width: '100%',
+    height: 1.5,
+    backgroundColor: GL.green800,
+    marginVertical: 8,
+  },
+
+  // Row
   row: {
-    gap: 2,
+    gap: 1,
     alignItems: 'flex-end',
     width: '100%',
   },
-  label: {
+  rowLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: GL.dimGreen,
     textAlign: 'right',
   },
-  value: {
+  rowValue: {
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'right',
+    lineHeight: 17,
   },
 });

@@ -1,8 +1,8 @@
 import { Spacing } from '@/constants/theme';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SwipeableStock } from './SwipeableStock';
 import { StockProps } from './Stock';
+import { SwipeableStock } from './SwipeableStock';
 
 export interface StockData extends StockProps {
   id?: string;
@@ -43,7 +43,7 @@ export function StockList({ stocks, onDelete, onAdd, onStarPress }: StockListPro
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.md,
-    alignItems: 'center',
+    //alignItems: 'center',
   },
 });
 

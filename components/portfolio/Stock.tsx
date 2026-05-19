@@ -1,8 +1,21 @@
-import { BorderRadius, Spacing } from '@/constants/theme';
-import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import React from 'react';
-import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
+import { Image, ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const GL = {
+  green900: '#0A2E1A',
+  green800: '#0F4526',
+  green700: '#166534',
+  green600: '#16A34A',
+  green500: '#22C55E',
+  green400: '#4ADE80',
+  green300: '#86EFAC',
+  green200: '#BBF7D0',
+  green100: '#DCFCE7',
+  green50:  '#F0FDF4',
+  white:    '#FFFFFF',
+  dimGreen: '#6B9E7A',
+};
 
 export interface StockProps {
   symbol: string;
@@ -14,74 +27,156 @@ export interface StockProps {
   onStarPress?: () => void;
 }
 
-export function Stock({ symbol, shares, pricePerShare, logo, isPositive = true }: StockProps) {
+export function Stock({
+  symbol,
+  shares,
+  pricePerShare,
+  logo,
+  isPositive = true,
+  isStarred = false,
+  onStarPress,
+}: StockProps) {
   const colors = usePortfolioColors();
 
   return (
     <View style={styles.container}>
-      <Image source={logo} style={styles.logo} />
+
+      {/* Left: logo */}
+      <View style={styles.logoWrapper}>
+        <Image source={logo} style={styles.logo} />
+      </View>
+
+      {/* Center: symbol + price */}
       <View style={styles.content}>
-        <View style={styles.textContainer}>
-          <Text style={[Typography.bodyMedium, { color: isPositive ? colors.primaryGreen : colors.errorRed }]}>
-            {symbol} {shares} shares
-          </Text>
-          <Text style={[Typography.body, { color: colors.textSecondary }]}>{pricePerShare}/share</Text>
-        </View>
+        <Text style={[styles.symbol, { color: isPositive ? GL.green700 : colors.errorRed }]}>
+          {symbol}
+        </Text>
+        <Text style={styles.shares}>
+          {shares} {shares === 1 ? 'share' : 'shares'} · {pricePerShare}/share
+        </Text>
       </View>
+
+      {/* Right: positive/negative indicator pill + optional star */}
       <View style={styles.rightSection}>
-        <View style={[styles.coloredRectangle, { backgroundColor: colors.stockCardBackground }]} />
-        <View style={styles.iconContainer}>
-          <View style={[styles.icon, { backgroundColor: colors.black }]} />
+        <View
+          style={[
+            styles.indicatorPill,
+            { backgroundColor: isPositive ? GL.green100 : '#FEE2E2' },
+          ]}
+        >
+          <View
+            style={[
+              styles.indicatorDot,
+              { backgroundColor: isPositive ? GL.green500 : colors.errorRed },
+            ]}
+          />
+          <Text
+            style={[
+              styles.indicatorText,
+              { color: isPositive ? GL.green700 : colors.errorRed },
+            ]}
+          >
+            {isPositive ? 'Gain' : 'Loss'}
+          </Text>
         </View>
+
+        {onStarPress && (
+          <TouchableOpacity
+            onPress={onStarPress}
+            hitSlop={8}
+            style={styles.starButton}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.starGlyph, { color: isStarred ? GL.green500 : GL.green200 }]}>
+              {isStarred ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: 360,
-    height: 55,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: GL.green100,
+  },
+
+  // Logo
+  logoWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: GL.green50,
+    borderWidth: 1,
+    borderColor: GL.green200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
   },
   logo: {
-    width: 52,
-    height: 52,
-    borderRadius: BorderRadius.lg,
-    marginRight: Spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
   },
+
+  // Text
   content: {
     flex: 1,
-    justifyContent: 'center',
+    gap: 3,
+    minWidth: 0,
   },
-  textContainer: {
-    gap: Spacing.xs,
+  symbol: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
+  shares: {
+    fontSize: 12,
+    color: GL.dimGreen,
+    fontWeight: '400',
+  },
+
+  // Right side
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
-    marginLeft: Spacing.lg,
+    gap: 10,
+    flexShrink: 0,
   },
-  coloredRectangle: {
-    width: 125,
-    height: 55,
-    borderRadius: BorderRadius.sm,
-    marginRight: Spacing.md,
-  },
-  iconContainer: {
-    width: 27,
-    height: 27,
-    justifyContent: 'center',
+  indicatorPill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  icon: {
-    width: 27,
-    height: 27,
-    opacity: 0.1,
-    borderRadius: BorderRadius.sm,
+  indicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  indicatorText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Star
+  starButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starGlyph: {
+    fontSize: 18,
+    lineHeight: 22,
   },
 });
-
