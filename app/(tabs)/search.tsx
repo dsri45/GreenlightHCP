@@ -5,13 +5,14 @@ import { PredictionModal } from '@/components/search/PredictionModal';
 import { SearchBar } from '@/components/search/SearchBar';
 import { Spacing } from '@/constants/theme';
 import { buildOneYearPortfolioChartData, buildOneYearStockChartData } from '@/data/mockPortfolio';
-import { resolveStockSearch } from '@/data/stockLookup';
+import { useResolvedStock } from '@/hooks/use-resolved-stock';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
 import { usePortfolioNews } from '@/hooks/use-portfolio-news';
-import { fetchStockPrediction } from '@/services/claude-prediction';
+import { fetchStockPrediction, StockPrediction } from '@/services/claude-prediction';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 
 // ─── Greenlight brand palette ─────────────────────────────────────────────────
 const GL = {
@@ -42,12 +43,9 @@ export default function SearchScreen() {
   const { holdings } = usePortfolioHoldings();
 
   const trimmedQuery = query.trim();
-  const resolvedStock = useMemo(
-    () => (trimmedQuery ? resolveStockSearch(trimmedQuery, holdings) : null),
-    [trimmedQuery, holdings]
-  );
+  const { stock: resolvedStock, loading: searchLoading, source: searchSource } = useResolvedStock(trimmedQuery, holdings);
   const isStockSearch = Boolean(resolvedStock);
-  const hasUnresolvedQuery = Boolean(trimmedQuery) && !resolvedStock;
+  const hasUnresolvedQuery = Boolean(trimmedQuery) && !resolvedStock && !searchLoading;
 
   const { articles, loading: newsLoading, error: newsError, getAgeLabel } = usePortfolioNews(
     holdings,
@@ -85,8 +83,8 @@ export default function SearchScreen() {
   const changeValue = isStockSearch
     ? resolvedStock!.yearlyChangePct
     : holdings.reduce((sum, h) => sum + h.yearlyChangePct, 0) / Math.max(holdings.length, 1);
-  const changeLabel = `${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(1)}% this year`;
-
+  const changeLabel = `${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(1)}% ${searchSource === 'finnhub' ? 'today' : 'this year'}`;
+  
   const secondaryMetricLabel = isStockSearch ? 'Ticker' : 'Holdings';
   const secondaryMetricValue = isStockSearch ? resolvedStock!.symbol : `${holdings.length}`;
   const secondaryMetricSub = isStockSearch ? resolvedStock!.displayName : 'Active positions';
@@ -139,19 +137,29 @@ export default function SearchScreen() {
           placeholder="Search a stock or company"
         />
 
-        {/* ── Unresolved query notice ─────────────────────────────────────── */}
-        {hasUnresolvedQuery && (
-          <View style={styles.unresolvedBanner}>
-            <View style={styles.unresolvedAccent} />
-            <Text style={styles.unresolvedText}>
-              No match for &ldquo;{trimmedQuery}&rdquo;. Try a ticker (e.g. AAPL) or company name.
-            </Text>
-          </View>
-        )}
+       {/* ── Loading state for Finnhub fallback ──────────────────────────── */}
+{searchLoading && (
+  <View style={styles.unresolvedBanner}>
+    <View style={styles.unresolvedAccent} />
+    <Text style={styles.unresolvedText}>
+      Looking up &ldquo;{trimmedQuery.toUpperCase()}&rdquo;...
+    </Text>
+  </View>
+)}
+
+{/* ── Unresolved query notice ─────────────────────────────────────── */}
+{hasUnresolvedQuery && (
+  <View style={styles.unresolvedBanner}>
+    <View style={styles.unresolvedAccent} />
+    <Text style={styles.unresolvedText}>
+      No match for &ldquo;{trimmedQuery}&rdquo;. Try a ticker (e.g. AAPL) or company name.
+    </Text>
+  </View>
+)}
 
         {/* ── Bento grid (hidden when query is unresolved) ────────────────── */}
-        {!hasUnresolvedQuery && (
-          <View style={styles.bento}>
+        {!hasUnresolvedQuery && !searchLoading && (
+  <View style={styles.bento}>
 
             {/* Row 1: two stat tiles side-by-side */}
             <View style={styles.bentoRow}>
