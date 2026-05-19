@@ -1,5 +1,6 @@
 import { PortfolioHolding, mockPortfolioHoldings } from '@/data/mockPortfolio';
-import React, { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { fetchStockQuotes } from '@/services/finnhub-stocks';
+import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
 interface PortfolioHoldingsContextValue {
   holdings: PortfolioHolding[];
@@ -11,6 +12,27 @@ const PortfolioHoldingsContext = createContext<PortfolioHoldingsContextValue | u
 
 export function PortfolioHoldingsProvider({ children }: { children: ReactNode }) {
   const [holdings, setHoldings] = useState<PortfolioHolding[]>(mockPortfolioHoldings);
+
+  useEffect(() => {
+    let cancelled = false;
+    const symbols = mockPortfolioHoldings.map((h) => h.symbol);
+
+    fetchStockQuotes(symbols).then((quoteMap) => {
+      if (cancelled) return;
+
+      setHoldings((prev) =>
+        prev.map((holding) => {
+          const quote = quoteMap.get(holding.symbol);
+          if (!quote) return holding; // keep mock price if fetch failed
+          return { ...holding, currentPrice: quote.currentPrice };
+        })
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const value = useMemo<PortfolioHoldingsContextValue>(
     () => ({
