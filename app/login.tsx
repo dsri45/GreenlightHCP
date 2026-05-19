@@ -1,16 +1,17 @@
 import { Spacing } from '@/constants/theme';
+import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import { Href, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -54,13 +55,11 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
 
-          {/* ── Brand header ────────────────────────────────────────────── */}
           <View style={styles.header}>
-            <View style={styles.headerPipRow}>
-              <View style={styles.headerPip} />
+            <View style={styles.brandContainer}>
+              <Text style={[Typography.brand, styles.brandText, { color: colors.greenlightBrand }]}>Greenlight</Text>
+              <Text style={styles.brandTagline}>Welcome back.</Text>
             </View>
-            <Text style={styles.brandName}>Greenlight</Text>
-            <Text style={styles.brandTagline}>Welcome back.</Text>
           </View>
 
           {/* ── Form tile ───────────────────────────────────────────────── */}
@@ -134,7 +133,7 @@ export default function LoginScreen() {
               ]}
               onPress={() => {}}
             >
-              <Text style={styles.socialButtonText}>🍎  Apple</Text>
+              <Text style={styles.socialButtonText}>Apple</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -143,7 +142,7 @@ export default function LoginScreen() {
               ]}
               onPress={() => {}}
             >
-              <Text style={styles.socialButtonText}>G  Google</Text>
+              <Text style={styles.socialButtonText}>Google</Text>
             </Pressable>
           </View>
 
@@ -181,8 +180,23 @@ const styles = StyleSheet.create({
 
   // ── Header ──────────────────────────────────────────────────────────────
   header: {
+    width: '100%',
+    paddingTop: 30,
+    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+  },
+  brandContainer: {
+    alignSelf: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    justifyContent: 'center',
+    marginBottom: Spacing.xl,
+  },
+  brandText: {
+    textAlign: 'center',
+  },
+  pageTitleContainer: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.xs,
   },
   headerPipRow: {
     flexDirection: 'row',

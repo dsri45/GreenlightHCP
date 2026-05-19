@@ -16,12 +16,14 @@ export const Typography = StyleSheet.create({
   },
   // Page title (used for tab page titles like "Portfolio", "Watchlist")
   pageTitle: {
-    fontFamily: 'Inter',
+    //fontFamily: 'Inter',
     fontStyle: 'normal',
     fontWeight: '600',
     fontSize: 20,
     lineHeight: 28,
     letterSpacing: -0.02,
+    //textTransform: 'uppercase',
+    marginBottom: 4,
   },
   h2Small: {
     fontFamily: 'Inter',
@@ -75,7 +77,7 @@ export const Typography = StyleSheet.create({
     fontFamily: 'Gasoek One',
     fontStyle: 'normal',
     fontWeight: '400',
-    fontSize: 26,
+    fontSize: 30,
     lineHeight: 34,
     letterSpacing: -0.01,
   },
