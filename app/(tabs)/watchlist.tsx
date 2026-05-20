@@ -176,8 +176,8 @@ export default function WatchlistScreen() {
           <View style={styles.stockListWrapper}>
             <StockList
               stocks={watchlistWithStarred}
-              onDelete={removeFromWatchlist}
-              onStarPress={removeFromWatchlist}
+              onDelete={(stock) => removeFromWatchlist(stock.symbol)}
+  onStarPress={(stock) => removeFromWatchlist(stock.symbol)}
               onPress={openStockModal}
             />
           </View>
