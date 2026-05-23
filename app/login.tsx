@@ -1,9 +1,14 @@
 import { Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
+import { persistLoginExpiry } from '@/lib/auth';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { useSocialAuth } from '@/hooks/use-social-auth';
 import { Href, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -36,8 +41,42 @@ export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { signInWithGoogle, oauthLoading, oauthError, clearOauthError } = useSocialAuth();
 
-  const handleContinue = () => {
+  const displayError = error ?? oauthError;
+
+  const handleContinue = async () => {
+    setError(null);
+    clearOauthError();
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setError(
+        'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY to your .env file.',
+      );
+      return;
+    }
+
+    setLoading(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    });
+    setLoading(false);
+
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+
+    await persistLoginExpiry();
     router.replace('/(tabs)/portfolio');
   };
 
@@ -101,15 +140,23 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {displayError ? <Text style={styles.errorText}>{displayError}</Text> : null}
+
             {/* CTA */}
             <Pressable
               style={({ pressed }) => [
                 styles.continueButton,
-                pressed && styles.continueButtonPressed,
+                (pressed || loading) && styles.continueButtonPressed,
+                loading && styles.continueButtonDisabled,
               ]}
               onPress={handleContinue}
+              disabled={loading}
             >
-              <Text style={styles.continueButtonText}>Continue</Text>
+              {loading ? (
+                <ActivityIndicator color={GL.white} />
+              ) : (
+                <Text style={styles.continueButtonText}>Continue</Text>
+              )}
             </Pressable>
 
             <Text style={styles.terms}>
@@ -124,27 +171,11 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* ── Social login ─────────────────────────────────────────────── */}
-          <View style={styles.socialRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.socialButton,
-                pressed && styles.socialButtonPressed,
-              ]}
-              onPress={() => {}}
-            >
-              <Text style={styles.socialButtonText}>Apple</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.socialButton,
-                pressed && styles.socialButtonPressed,
-              ]}
-              onPress={() => {}}
-            >
-              <Text style={styles.socialButtonText}>Google</Text>
-            </Pressable>
-          </View>
+          <GoogleSignInButton
+            onPress={signInWithGoogle}
+            loading={oauthLoading}
+            disabled={loading}
+          />
 
           {/* ── Signup link ──────────────────────────────────────────────── */}
           <View style={styles.footer}>
@@ -296,6 +327,15 @@ const styles = StyleSheet.create({
   continueButtonPressed: {
     backgroundColor: GL.green700,
   },
+  continueButtonDisabled: {
+    opacity: 0.85,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#B91C1C',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
   continueButtonText: {
     color: GL.white,
     fontSize: 15,
@@ -327,31 +367,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GL.dimGreen,
     fontWeight: '500',
-  },
-
-  // ── Social buttons ───────────────────────────────────────────────────────
-  socialRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  socialButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: GL.green200,
-    backgroundColor: GL.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialButtonPressed: {
-    backgroundColor: GL.green50,
-  },
-  socialButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: GL.green900,
-    letterSpacing: 0.1,
   },
 
   // ── Footer ───────────────────────────────────────────────────────────────

@@ -1,8 +1,11 @@
 import { Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
+import { signOut } from '@/lib/auth';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface TabScreenLayoutProps {
@@ -16,19 +19,36 @@ interface TabScreenLayoutProps {
  */
 export function TabScreenLayout({ children, pageTitle }: TabScreenLayoutProps) {
   const colors = usePortfolioColors();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace('/login');
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
-      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.brandContainer}>
-          <Text style={[Typography.brand, styles.brandText, { color: colors.greenlightBrand }]}>Greenlight</Text>
+        <View style={styles.headerBar}>
+          <Pressable
+            style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
+            onPress={handleLogout}
+            accessibilityLabel="Log out"
+            hitSlop={8}
+          >
+            <Ionicons name="log-out-outline" size={22} color={colors.greenlightBrand} />
+          </Pressable>
+          <View style={styles.brandContainer} pointerEvents="none">
+            <Text style={[Typography.brand, styles.brandText, { color: colors.greenlightBrand }]}>
+              Greenlight
+            </Text>
+          </View>
         </View>
-        {pageTitle && (
+        {pageTitle ? (
           <View style={styles.pageTitleContainer}>
             <Text style={[Typography.pageTitle, { color: colors.textPrimary }]}>{pageTitle}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {children}
@@ -46,11 +66,24 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.xl,
   },
-  brandContainer: {
-    alignSelf: 'center',
+  headerBar: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.xs,
+    minHeight: 48,
+  },
+  logoutButton: {
+    position: 'absolute',
+    left: 0,
+    padding: Spacing.xs,
+    zIndex: 1,
+  },
+  logoutButtonPressed: {
+    opacity: 0.6,
+  },
+  brandContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   brandText: {
     textAlign: 'center',
@@ -60,4 +93,3 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
 });
-

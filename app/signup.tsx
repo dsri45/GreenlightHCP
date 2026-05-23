@@ -1,9 +1,16 @@
 import { Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
+import { AUTH_REDIRECT_URI } from '@/lib/auth-redirect';
+import { persistLoginExpiry } from '@/lib/auth';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { useSocialAuth } from '@/hooks/use-social-auth';
+import { formatUsPhoneDisplay, phoneToE164 } from '@/utils/format-phone';
 import { Href, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -38,9 +45,63 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { signInWithGoogle, oauthLoading, oauthError, clearOauthError } = useSocialAuth();
 
-  const handleContinue = () => {
-    router.replace('/(tabs)/portfolio');
+  const displayError = error ?? oauthError;
+
+  const handleContinue = async () => {
+    setError(null);
+    clearOauthError();
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const phoneE164 = phoneToE164(phone);
+
+    if (!trimmedName || !trimmedEmail || !password) {
+      setError('Please enter your name, email, and password.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setError(
+        'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY to your .env file.',
+      );
+      return;
+    }
+
+    setLoading(true);
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password,
+      options: {
+        emailRedirectTo: AUTH_REDIRECT_URI,
+        data: {
+          full_name: trimmedName,
+          phone: phoneE164,
+        },
+      },
+    });
+    setLoading(false);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      return;
+    }
+
+    if (data.session) {
+      await persistLoginExpiry();
+      router.replace('/(tabs)/portfolio');
+      return;
+    }
+
+    setError('Check your email to confirm your account. The link will open Greenlight on your phone.');
   };
 
   return (
@@ -121,7 +182,7 @@ export default function SignupScreen() {
                   placeholder="+1 (555) 000-0000"
                   placeholderTextColor={GL.dimGreen}
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(text) => setPhone(formatUsPhoneDisplay(text))}
                   keyboardType="phone-pad"
                 />
               </View>
@@ -142,12 +203,23 @@ export default function SignupScreen() {
               </View>
             </View>
 
+            {displayError ? <Text style={styles.errorText}>{displayError}</Text> : null}
+
             {/* CTA button */}
             <Pressable
-              style={({ pressed }) => [styles.continueButton, pressed && styles.continueButtonPressed]}
+              style={({ pressed }) => [
+                styles.continueButton,
+                (pressed || loading) && styles.continueButtonPressed,
+                loading && styles.continueButtonDisabled,
+              ]}
               onPress={handleContinue}
+              disabled={loading}
             >
-              <Text style={styles.continueButtonText}>Continue</Text>
+              {loading ? (
+                <ActivityIndicator color={GL.white} />
+              ) : (
+                <Text style={styles.continueButtonText}>Continue</Text>
+              )}
             </Pressable>
 
             <Text style={styles.terms}>
@@ -162,21 +234,11 @@ export default function SignupScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* ── Social login ──────────────────────────────────────────────── */}
-          <View style={styles.socialRow}>
-            <Pressable
-              style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
-              onPress={() => {}}
-            >
-              <Text style={styles.socialButtonText}>Apple</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
-              onPress={() => {}}
-            >
-              <Text style={styles.socialButtonText}>Google</Text>
-            </Pressable>
-          </View>
+          <GoogleSignInButton
+            onPress={signInWithGoogle}
+            loading={oauthLoading}
+            disabled={loading}
+          />
 
           {/* ── Login link ────────────────────────────────────────────────── */}
           <View style={styles.footer}>
@@ -329,6 +391,15 @@ const styles = StyleSheet.create({
   continueButtonPressed: {
     backgroundColor: GL.green700,
   },
+  continueButtonDisabled: {
+    opacity: 0.85,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#B91C1C',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
   continueButtonText: {
     color: GL.white,
     fontSize: 15,
@@ -360,31 +431,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: GL.dimGreen,
     fontWeight: '500',
-  },
-
-  // ── Social buttons ────────────────────────────────────────────────────────
-  socialRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  socialButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: GL.green200,
-    backgroundColor: GL.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialButtonPressed: {
-    backgroundColor: GL.green50,
-  },
-  socialButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: GL.green900,
-    letterSpacing: 0.1,
   },
 
   // ── Footer ────────────────────────────────────────────────────────────────
