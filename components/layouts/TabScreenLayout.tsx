@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    paddingTop: 30,
+    paddingTop: 50,
     paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.xl,
   },

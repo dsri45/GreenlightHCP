@@ -1,5 +1,6 @@
 import { PortfolioHolding } from '@/data/mockPortfolio';
-import { getSearchTermsForSymbol, resolveStockSearch } from '@/data/stockLookup';
+import { getSearchTermsForSymbol } from '@/data/stockLookup';
+import { resolveStockFromDatabase } from '@/services/supabase/stock-search';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const NEWS_API_BASE_URL = 'https://eventregistry.org/api/v1/article/getArticles';
@@ -124,10 +125,29 @@ export function usePortfolioNews(holdings: PortfolioHolding[], searchQuery = '')
   const lastUpdatedAtRef = useRef<number | null>(null);
 
   const trimmedQuery = searchQuery.trim();
-  const resolvedStock = useMemo(
-    () => (trimmedQuery ? resolveStockSearch(trimmedQuery, holdings) : null),
-    [trimmedQuery, holdings]
-  );
+  const [resolvedStock, setResolvedStock] = useState<{ symbol: string } | null>(null);
+
+  useEffect(() => {
+    if (!trimmedQuery) {
+      setResolvedStock(null);
+      return;
+    }
+
+    let cancelled = false;
+    resolveStockFromDatabase(trimmedQuery, holdings)
+      .then((result) => {
+        if (cancelled) return;
+        setResolvedStock(result ? { symbol: result.symbol } : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResolvedStock(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trimmedQuery, holdings]);
 
   const symbols = useMemo(() => {
     if (resolvedStock) return [resolvedStock.symbol];

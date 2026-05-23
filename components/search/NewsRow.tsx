@@ -6,16 +6,16 @@ import { Image } from 'expo-image';
 import React from 'react';
 import { ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const DEFAULT_NEWS_LOGO = require('@/assets/images/icon.png');
-
 export function NewsRow({
   title,
   ageLabel,
-  logo = DEFAULT_NEWS_LOGO,
+  sourceName,
+  logo,
   onPress,
 }: {
   title: string;
   ageLabel: string;
+  sourceName?: string;
   logo?: ImageSourcePropType;
   onPress: () => void;
 }) {
@@ -24,10 +24,17 @@ export function NewsRow({
   return (
     <View style={styles.row}>
       <View style={styles.left}>
-        <View style={[styles.logoWrapper, { backgroundColor: colors.white, borderColor: colors.borderLight }]}>
-          <Image source={logo} style={styles.logo} contentFit="contain" />
-        </View>
+        {logo != null && (
+          <View style={[styles.logoWrapper, { backgroundColor: colors.white, borderColor: colors.borderLight }]}>
+            <Image source={logo} style={styles.logo} contentFit="contain" />
+          </View>
+        )}
         <View style={styles.textBlock}>
+          {sourceName ? (
+            <Text style={[Typography.small, styles.sourceLabel, { color: colors.textTertiary }]}>
+              {sourceName}
+            </Text>
+          ) : null}
           <Text style={[Typography.bodyMedium, { color: colors.textPrimary }]} numberOfLines={2}>
             {title}
           </Text>
@@ -79,6 +86,12 @@ const styles = StyleSheet.create({
   textBlock: {
     flex: 1,
     minWidth: 0,
+  },
+  sourceLabel: {
+    fontSize: 10,
+    letterSpacing: 0.3,
+    marginBottom: 2,
+    textTransform: 'uppercase',
   },
   button: {
     flexDirection: 'row',

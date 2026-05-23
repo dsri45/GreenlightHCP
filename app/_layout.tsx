@@ -7,6 +7,7 @@ import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useStocksBootstrap } from '@/hooks/use-stocks-bootstrap';
 import { completeAuthFromUrl, isAuthRedirectUrl } from '@/lib/auth-session';
 import { GasoekOne_400Regular } from '@expo-google-fonts/gasoek-one';
 import * as Linking from 'expo-linking';
@@ -22,6 +23,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  useStocksBootstrap();
   const [fontsLoaded, fontError] = useFonts({
     'Gasoek One': GasoekOne_400Regular,
   });

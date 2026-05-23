@@ -1,3 +1,4 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import React from 'react';
 import {
@@ -31,7 +32,9 @@ export interface StockProps {
   logo: ImageSourcePropType;
   isPositive?: boolean;
   isStarred?: boolean;
+  isOwned?: boolean;
   onStarPress?: () => void;
+  onSellPress?: () => void;
   onPress?: () => void;
   currentPrice?: number;
   yearlyChangePct?: number;
@@ -44,8 +47,10 @@ export function Stock({
   logo,
   isPositive = true,
   isStarred = false,
+  isOwned = false,
   onStarPress,
-  onPress, // <-- FIXED: this was missing
+  onSellPress,
+  onPress,
 }: StockProps) {
   const colors = usePortfolioColors();
 
@@ -96,18 +101,29 @@ export function Stock({
             </Text>
           </View>
 
-          {onStarPress && (
+          {isOwned && onSellPress ? (
+            <TouchableOpacity
+              onPress={onSellPress}
+              hitSlop={8}
+              style={styles.actionButton}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="delete-outline" size={22} color={colors.errorRed} />
+            </TouchableOpacity>
+          ) : null}
+
+          {!isOwned && onStarPress ? (
             <TouchableOpacity
               onPress={onStarPress}
               hitSlop={8}
-              style={styles.starButton}
+              style={styles.actionButton}
               activeOpacity={0.7}
             >
               <Text style={[styles.starGlyph, { color: isStarred ? GL.green500 : GL.green200 }]}>
                 {isStarred ? '★' : '☆'}
               </Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
     </TouchableOpacity>
@@ -186,7 +202,7 @@ const styles = StyleSheet.create({
   touchable: {
     width: '100%',
   },
-  starButton: {
+  actionButton: {
     alignItems: 'center',
     justifyContent: 'center',
   },

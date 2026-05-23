@@ -15,10 +15,13 @@ const CHART_HEIGHT_DEFAULT = 220;
 const CHART_WIDTH_COMPACT_FALLBACK = 168;
 const CHART_HEIGHT_COMPACT_FALLBACK = 200;
 const CHART_PADDING = 8;
-const Y_AXIS_GUTTER = 60;
-const X_AXIS_HEIGHT = 30;
+const AXIS_PLOT_PADDING = 20;
+const X_AXIS_LABEL_HEIGHT = 14;
 const Y_TICK_COUNT = 5;
 const X_TICK_MAX = 10;
+const Y_LABEL_CHAR_WIDTH = 5.5;
+const Y_LABEL_MIN_WIDTH = 22;
+const Y_LABEL_EDGE_GAP = 2;
 
 function toCartesianData(
   period: string,
@@ -35,7 +38,25 @@ function toCartesianData(
 function formatDollarAxis(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}k`;
-  return `$${(value).toFixed(1)}`;
+  return `$${value.toFixed(0)}`;
+}
+
+function computeYTicks(values: number[]): number[] {
+  if (values.length === 0) return [];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  return Array.from({ length: Y_TICK_COUNT }, (_, i) => {
+    const ratio = i / (Y_TICK_COUNT - 1);
+    return max - ratio * range;
+  });
+}
+
+function measureYAxisWidth(ticks: number[]): number {
+  if (ticks.length === 0) return Y_LABEL_MIN_WIDTH;
+  const labels = ticks.map(formatDollarAxis);
+  const longest = Math.max(...labels.map((label) => label.length));
+  return Math.max(Y_LABEL_MIN_WIDTH, Math.ceil(longest * Y_LABEL_CHAR_WIDTH) + Y_LABEL_EDGE_GAP);
 }
 
 function pickTickIndices(length: number, maxTicks: number): number[] {
@@ -45,6 +66,11 @@ function pickTickIndices(length: number, maxTicks: number): number[] {
     indices.push(Math.round((i / (maxTicks - 1)) * (length - 1)));
   }
   return Array.from(new Set(indices));
+}
+
+function getXTickCount(period: string, dataLength: number): number {
+  if (period === '1Y' || period === '2Y' || dataLength >= 10) return 4;
+  return Math.min(X_TICK_MAX, 6, dataLength);
 }
 
 function shortenXLabel(label: string, period: string): string {
@@ -62,6 +88,7 @@ interface PortfolioGraphProps {
   showBorder?: boolean;
   compact?: boolean;
   showAxes?: boolean;
+  embedded?: boolean;
 }
 
 export function PortfolioGraph({
@@ -71,6 +98,7 @@ export function PortfolioGraph({
   showBorder = true,
   compact = false,
   showAxes = false,
+  embedded = false,
 }: PortfolioGraphProps) {
   const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
   const [chartSize, setChartSize] = useState({
@@ -81,24 +109,51 @@ export function PortfolioGraph({
   });
   const colors = usePortfolioColors();
 
-  const handleChartLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const { width, height } = event.nativeEvent.layout;
-      if (width < 1 || height < 1) return;
-      setChartSize({ width: Math.floor(width), height: Math.floor(height) });
-    },
-    []
-  );
-
-  const chartWidth = chartSize.width;
-  const chartHeight = chartSize.height;
-  const plotWidth = chartWidth - CHART_PADDING * 2;
-  const plotHeight = chartHeight - CHART_PADDING * 2 - (showAxes ? X_AXIS_HEIGHT : 0);
-
   const fallbackPeriod = periods.includes(initialPeriod) ? initialPeriod : periods[0] ?? '1M';
   const activePeriod = periods.includes(selectedPeriod) ? selectedPeriod : fallbackPeriod;
 
   const data = useMemo(() => toCartesianData(activePeriod, dataByPeriod), [activePeriod, dataByPeriod]);
+
+  const yTicksForLayout = useMemo(
+    () => computeYTicks(data.map((item) => item.value)),
+    [data],
+  );
+
+  const yAxisWidth = showAxes ? measureYAxisWidth(yTicksForLayout) : 0;
+
+  const plotPadLeft = showAxes ? AXIS_PLOT_PADDING : CHART_PADDING;
+  const plotPadTop = showAxes ? AXIS_PLOT_PADDING : CHART_PADDING;
+  const plotPadRight = showAxes ? AXIS_PLOT_PADDING : CHART_PADDING;
+  const plotPadBottom = showAxes ? AXIS_PLOT_PADDING : CHART_PADDING;
+  const xAxisReservedHeight = showAxes ? X_AXIS_LABEL_HEIGHT : 0;
+
+  const handleChartRowLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { width, height } = event.nativeEvent.layout;
+      if (width < 1) return;
+
+      const chartAreaWidth = showAxes
+        ? Math.max(1, Math.floor(width - yAxisWidth))
+        : Math.floor(width);
+
+      let totalHeight: number;
+      if (height > 1) {
+        totalHeight = Math.floor(height);
+      } else {
+        const plotHeight = Math.round(chartAreaWidth * 0.52);
+        totalHeight =
+          plotHeight + plotPadTop + plotPadBottom + xAxisReservedHeight;
+      }
+
+      setChartSize({ width: chartAreaWidth, height: totalHeight });
+    },
+    [showAxes, plotPadBottom, plotPadTop, xAxisReservedHeight, yAxisWidth],
+  );
+
+  const chartWidth = chartSize.width;
+  const chartHeight = chartSize.height;
+  const plotWidth = chartWidth - plotPadLeft - plotPadRight;
+  const plotHeight = chartHeight - plotPadTop - plotPadBottom - xAxisReservedHeight;
 
   const { minValue, maxValue, yTicks, xTicks, chartPath } = useMemo(() => {
     if (data.length < 2 || plotWidth <= 0 || plotHeight <= 0) {
@@ -110,12 +165,9 @@ export function PortfolioGraph({
     const max = Math.max(...values);
     const range = max - min || 1;
 
-    const ticks = Array.from({ length: Y_TICK_COUNT }, (_, i) => {
-      const ratio = i / (Y_TICK_COUNT - 1);
-      return max - ratio * range;
-    });
+    const ticks = computeYTicks(values);
 
-    const xIndices = pickTickIndices(data.length, X_TICK_MAX);
+    const xIndices = pickTickIndices(data.length, getXTickCount(activePeriod, data.length));
     const xTickLabels = xIndices.map((index) => ({
       index,
       label: shortenXLabel(data[index]?.label ?? '', activePeriod),
@@ -123,45 +175,60 @@ export function PortfolioGraph({
 
     const path = data
       .map((point, index) => {
-        const x = CHART_PADDING + (index / Math.max(data.length - 1, 1)) * plotWidth;
-        const y = CHART_PADDING + (1 - (point.value - min) / range) * plotHeight;
+        const x = plotPadLeft + (index / Math.max(data.length - 1, 1)) * plotWidth;
+        const y = plotPadTop + (1 - (point.value - min) / range) * plotHeight;
         return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
       })
       .join(' ');
 
     return { minValue: min, maxValue: max, yTicks: ticks, xTicks: xTickLabels, chartPath: path };
-  }, [activePeriod, data, plotHeight, plotWidth]);
+  }, [activePeriod, data, plotHeight, plotPadLeft, plotPadTop, plotWidth]);
 
   return (
     <View
       style={[
         styles.container,
         compact && styles.containerCompact,
+        embedded && styles.containerEmbedded,
         { backgroundColor: colors.chartBackground },
         showBorder && { borderColor: colors.borderLight, borderWidth: 1 },
       ]}
     >
-      <View style={[styles.timePeriodContainer, compact && styles.timePeriodContainerCompact]}>
-        {periods.map((period) => (
-          <TimePeriodButton
-            key={period}
-            period={period}
-            isSelected={activePeriod === period}
-            onPress={() => setSelectedPeriod(period)}
-          />
-        ))}
-      </View>
+      {periods.length > 1 && (
+        <View style={[styles.timePeriodContainer, compact && styles.timePeriodContainerCompact]}>
+          {periods.map((period) => (
+            <TimePeriodButton
+              key={period}
+              period={period}
+              isSelected={activePeriod === period}
+              onPress={() => setSelectedPeriod(period)}
+            />
+          ))}
+        </View>
+      )}
 
-      <View style={[styles.chartRow, compact && styles.chartRowCompact, showAxes && styles.chartRowWithAxes]}>
+      <View
+        style={[
+          styles.chartRow,
+          compact && styles.chartRowCompact,
+          embedded && styles.chartRowEmbedded,
+          showAxes && styles.chartRowWithAxes,
+        ]}
+        onLayout={compact || embedded ? handleChartRowLayout : undefined}
+      >
         {showAxes && (
-          <View style={[styles.yAxis, { width: Y_AXIS_GUTTER, height: chartHeight }]}>
+          <View style={[styles.yAxis, { width: yAxisWidth, height: chartHeight }]}>
             {yTicks.map((tick) => {
               const range = maxValue - minValue || 1;
-              const top = CHART_PADDING + ((maxValue - tick) / range) * plotHeight - 6;
+              const top = plotPadTop + ((maxValue - tick) / range) * plotHeight - 5;
               return (
                 <Text
                   key={tick}
-                  style={[Typography.small, styles.yAxisLabel, { color: colors.textTertiary, top }]}
+                  style={[
+                    Typography.small,
+                    styles.yAxisLabel,
+                    { color: colors.textTertiary, top, width: yAxisWidth },
+                  ]}
                 >
                   {formatDollarAxis(tick)}
                 </Text>
@@ -170,32 +237,28 @@ export function PortfolioGraph({
           </View>
         )}
 
-        <View
-          style={[styles.chartArea, showAxes && styles.chartAreaWithAxes]}
-          onLayout={compact ? handleChartLayout : undefined}
-        >
+        <View style={[styles.chartArea, showAxes && styles.chartAreaWithAxes]}>
           <View
             style={[
               styles.chartContainer,
-              compact ? styles.chartContainerCompact : styles.chartContainerDefault,
-              { backgroundColor: colors.chartBackground },
-              !compact && { width: CHART_WIDTH_DEFAULT, height: CHART_HEIGHT_DEFAULT },
+              compact || embedded ? styles.chartContainerCompact : styles.chartContainerDefault,
+              { backgroundColor: colors.chartBackground, width: chartWidth, height: chartHeight },
             ]}
           >
             <Svg width={chartWidth} height={chartHeight}>
               <SvgLine
-                x1={CHART_PADDING}
-                y1={CHART_PADDING + plotHeight}
-                x2={CHART_PADDING + plotWidth}
-                y2={CHART_PADDING + plotHeight}
+                x1={plotPadLeft}
+                y1={plotPadTop + plotHeight}
+                x2={plotPadLeft + plotWidth}
+                y2={plotPadTop + plotHeight}
                 stroke={colors.borderGridSolid}
                 strokeWidth={StyleSheet.hairlineWidth}
               />
               <SvgLine
-                x1={CHART_PADDING}
-                y1={CHART_PADDING}
-                x2={CHART_PADDING}
-                y2={CHART_PADDING + plotHeight}
+                x1={plotPadLeft}
+                y1={plotPadTop}
+                x2={plotPadLeft}
+                y2={plotPadTop + plotHeight}
                 stroke={colors.borderGridSolid}
                 strokeWidth={StyleSheet.hairlineWidth}
               />
@@ -206,15 +269,23 @@ export function PortfolioGraph({
 
             {showAxes &&
               xTicks.map(({ index, label }) => {
-                const left =
-                  CHART_PADDING + (index / Math.max(data.length - 1, 1)) * plotWidth - 14;
+                const xPos = plotPadLeft + (index / Math.max(data.length - 1, 1)) * plotWidth;
+                const slotWidth = plotWidth / Math.max(xTicks.length - 1, 1);
+                const labelWidth = Math.min(44, slotWidth * 0.92);
+                const rawLeft = xPos - labelWidth / 2;
+                const left = Math.max(0, Math.min(rawLeft, chartWidth - labelWidth));
                 return (
                   <Text
                     key={`${index}-${label}`}
                     style={[
                       Typography.small,
                       styles.xAxisLabel,
-                      { color: colors.textTertiary, left, top: CHART_PADDING + plotHeight + 4 },
+                      {
+                        color: colors.textTertiary,
+                        left,
+                        top: plotPadTop + plotHeight + 1,
+                        width: labelWidth,
+                      },
                     ]}
                     numberOfLines={1}
                   >
@@ -231,10 +302,8 @@ export function PortfolioGraph({
 
 const styles = StyleSheet.create({
   container: {
-    width: 343,
-    minHeight: 282,
     borderRadius: BorderRadius.sm,
-    paddingTop: Spacing.md,
+    paddingTop: 10,
     paddingHorizontal: Spacing.sm,
     paddingBottom: Spacing.sm,
     alignItems: 'center',
@@ -244,11 +313,20 @@ const styles = StyleSheet.create({
     width: '100%',
     flex: 1,
     alignSelf: 'stretch',
-    alignItems: 'flex-start',
+    minHeight: 0,
+    paddingTop: 0,
     paddingLeft: 0,
-    paddingRight: Spacing.xs,
-    paddingBottom: Spacing.xs,
-    minHeight: 260,
+    paddingRight: 0,
+    paddingBottom: 0,
+  },
+  containerEmbedded: {
+    width: '100%',
+    flex: 1,
+    minHeight: 0,
+    paddingTop: 0,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+    alignItems: 'stretch',
   },
   timePeriodContainer: {
     flexDirection: 'row',
@@ -268,7 +346,11 @@ const styles = StyleSheet.create({
   },
   chartRowCompact: {
     flex: 1,
-    minHeight: CHART_HEIGHT_COMPACT_FALLBACK,
+    minHeight: 0,
+  },
+  chartRowEmbedded: {
+    flex: 1,
+    minHeight: 0,
   },
   chartRowWithAxes: {
     flexDirection: 'row',
@@ -276,7 +358,7 @@ const styles = StyleSheet.create({
   },
   chartArea: {
     flex: 1,
-    width: '100%',
+    minWidth: 0,
     alignSelf: 'stretch',
   },
   chartAreaWithAxes: {
@@ -292,26 +374,28 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   chartContainerCompact: {
-    flex: 1,
     width: '100%',
-    alignSelf: 'flex-start',
-    overflow: 'hidden',
+    alignSelf: 'stretch',
+    overflow: 'visible',
   },
   yAxis: {
     flexShrink: 0,
     position: 'relative',
+    paddingLeft: 0,
+    marginLeft: 0,
   },
   yAxisLabel: {
     position: 'absolute',
-    right: 2,
+    right: 0,
     fontSize: 9,
-    width: Y_AXIS_GUTTER - 6,
+    lineHeight: 10,
     textAlign: 'right',
+    paddingRight: 0,
   },
   xAxisLabel: {
     position: 'absolute',
     fontSize: 9,
-    width: 32,
+    lineHeight: 10,
     textAlign: 'center',
   },
 });

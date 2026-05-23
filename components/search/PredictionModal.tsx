@@ -33,6 +33,7 @@ interface PredictionModalProps {
   error: string | null;
   prediction: StockPrediction | null;
   onClose: () => void;
+  onPickPress?: (symbol: string) => void;
 }
 
 export function PredictionModal({
@@ -41,6 +42,7 @@ export function PredictionModal({
   error,
   prediction,
   onClose,
+  onPickPress,
 }: PredictionModalProps) {
   const colors = usePortfolioColors();
 
@@ -163,8 +165,13 @@ export function PredictionModal({
 
               {/* Industry Picks */}
               {prediction.industryPicks.map((pick) => (
-                <View
+                <TouchableOpacity
                   key={pick.symbol}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    onPickPress?.(pick.symbol);
+                    onClose();
+                  }}
                   style={[
                     styles.pickRow,
                     {
@@ -179,7 +186,7 @@ export function PredictionModal({
                   <Text style={styles.pickReason}>
                     {pick.rationale}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
 
               {/* Disclaimer */}

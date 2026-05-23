@@ -7,8 +7,18 @@ import {
   computePortfolioAnalytics,
 } from '@/data/mockPortfolio';
 import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
+import { useWatchlist } from '@/hooks/use-watchlist';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 // ─── Greenlight brand palette ─────────────────────────────────────────────────
 const GL = {
@@ -28,39 +38,53 @@ const GL = {
 };
 
 export default function PortfolioScreen() {
-  const { holdings, addShare, removeHolding } = usePortfolioHoldings();
-  const [watchlistSymbols, setWatchlistSymbols] = useState<Set<string>>(new Set(['MSFT', 'NVDA']));
+  const { holdings, addShare, sellShares } = usePortfolioHoldings();
+  const { watchlist } = useWatchlist();
+  const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
+  const [quantity, setQuantity] = useState('1');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const chartDataByPeriod = useMemo(() => buildPortfolioChartDataByPeriod(holdings), [holdings]);
   const analytics = useMemo(() => computePortfolioAnalytics(holdings), [holdings]);
 
-  const toggleWatchlist = useCallback((stock: StockData) => {
-    setWatchlistSymbols((prev) => {
-      const next = new Set(prev);
-      if (next.has(stock.symbol)) next.delete(stock.symbol);
-      else next.add(stock.symbol);
-      return next;
-    });
-  }, []);
+  const selectedHolding = selectedStock
+    ? holdings.find((holding) => holding.symbol === selectedStock.symbol)
+    : undefined;
 
-  const handleDeleteStock = useCallback(
-    (stock: StockData) => {
-      removeHolding(stock.symbol);
-      setWatchlistSymbols((prev) => {
-        const next = new Set(prev);
-        next.delete(stock.symbol);
-        return next;
-      });
-    },
-    [removeHolding]
-  );
+  const parsedQuantity = parseInt(quantity, 10);
 
   const handleAddStock = useCallback(
     (stock: StockData) => {
       addShare(stock.symbol);
     },
-    [addShare]
+    [addShare],
   );
+
+  const openSellModal = useCallback((stock: StockData) => {
+    setSelectedStock(stock);
+    setQuantity('1');
+    setActionError(null);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setSelectedStock(null);
+    setQuantity('1');
+    setActionError(null);
+  }, []);
+
+  const handleSellShares = useCallback(() => {
+    if (!selectedStock || !selectedHolding) return;
+    if (Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      setActionError('Enter a valid share quantity');
+      return;
+    }
+    if (parsedQuantity > selectedHolding.shares) {
+      setActionError(`You only have ${selectedHolding.shares} shares to sell`);
+      return;
+    }
+
+    void sellShares(selectedStock.symbol, parsedQuantity).then(closeModal);
+  }, [closeModal, parsedQuantity, selectedHolding, selectedStock, sellShares]);
 
   const stocks = useMemo<StockData[]>(
     () =>
@@ -70,16 +94,14 @@ export default function PortfolioScreen() {
         pricePerShare: `$${holding.currentPrice.toFixed(2)}`,
         logo: require('@/assets/images/icon.png'),
         isPositive: holding.yearlyChangePct >= 0,
+        isOwned: true,
+        currentPrice: holding.currentPrice,
+        yearlyChangePct: holding.yearlyChangePct,
       })),
-    [holdings]
+    [holdings],
   );
 
-  const stocksWithStarred = stocks.map((s) => ({
-    ...s,
-    isStarred: watchlistSymbols.has(s.symbol),
-  }));
-
-  const watchlistCount = watchlistSymbols.size;
+  const watchlistCount = watchlist.length;
   const totalPositions = holdings.length;
 
   return (
@@ -112,6 +134,7 @@ export default function PortfolioScreen() {
             <View style={styles.graphColumn}>
               <PortfolioGraph
                 compact
+                embedded
                 showAxes
                 showBorder={false}
                 dataByPeriod={chartDataByPeriod}
@@ -132,14 +155,55 @@ export default function PortfolioScreen() {
         {/* ── Stock list ───────────────────────────────────────────────────── */}
         <View style={styles.stockListWrapper}>
           <StockList
-            stocks={stocksWithStarred}
-            onDelete={handleDeleteStock}
+            stocks={stocks}
             onAdd={handleAddStock}
-            onStarPress={toggleWatchlist}
+            onSellPress={openSellModal}
           />
         </View>
 
       </ScrollView>
+
+      <Modal visible={Boolean(selectedStock)} transparent animationType="fade" onRequestClose={closeModal}>
+        <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+          <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.modalTitle}>
+              {selectedStock ? `Sell ${selectedStock.symbol}` : 'Sell shares'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              You own {selectedHolding?.shares ?? 0}{' '}
+              {selectedHolding?.shares === 1 ? 'share' : 'shares'}.
+            </Text>
+
+            <TextInput
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+              placeholder="Number of shares"
+              placeholderTextColor={GL.green300}
+              style={styles.modalInput}
+            />
+
+            {actionError ? <Text style={styles.modalError}>{actionError}</Text> : null}
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                onPress={closeModal}
+                style={[styles.modalButton, styles.cancelButton]}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSellShares}
+                style={[styles.modalButton, styles.sellButton]}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalButtonText}>Sell</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </TabScreenLayout>
   );
 }
@@ -210,22 +274,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dashboardRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: Spacing.md,
     minHeight: 280,
     width: '100%',
   },
   graphColumn: {
     flex: 1,
     minWidth: 0,
+    padding: 5,
     alignSelf: 'stretch',
   },
   analyticsColumn: {
-    width: 158,
     flexShrink: 0,
     alignSelf: 'stretch',
-    alignItems: 'flex-end',
   },
 
   // ── Section header ────────────────────────────────────────────────────────
@@ -253,5 +313,70 @@ const styles = StyleSheet.create({
   // ── Stock list wrapper ────────────────────────────────────────────────────
   stockListWrapper: {
     width: '100%',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: GL.white,
+    borderRadius: 20,
+    padding: Spacing.xl,
+    borderWidth: 1,
+    borderColor: GL.green100,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: GL.green900,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: GL.dimGreen,
+    marginBottom: Spacing.md,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: GL.green200,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: GL.green900,
+    marginBottom: Spacing.sm,
+  },
+  modalError: {
+    color: '#B91C1C',
+    fontSize: 12,
+    marginBottom: Spacing.sm,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+    marginTop: Spacing.sm,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: GL.green100,
+  },
+  cancelButtonText: {
+    color: GL.green800,
+    fontWeight: '700',
+  },
+  sellButton: {
+    backgroundColor: '#DC2626',
+  },
+  modalButtonText: {
+    color: GL.white,
+    fontWeight: '700',
   },
 });

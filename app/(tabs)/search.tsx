@@ -11,6 +11,8 @@ import { usePortfolioNews } from '@/hooks/use-portfolio-news';
 import { useResolvedStock } from '@/hooks/use-resolved-stock';
 import { useWatchlist } from '@/hooks/use-watchlist';
 import { fetchStockPrediction, StockPrediction } from '@/services/claude-prediction';
+import { getStockLogoUri } from '@/utils/stock-logo';
+import { Image } from 'expo-image';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -33,6 +35,28 @@ const GL = {
   white:    '#FFFFFF',
   dimGreen: '#6B9E7A',
 };
+
+function StockLogo({ symbol }: { symbol: string }) {
+  const [failed, setFailed] = useState(false);
+  const initials = symbol.slice(0, 1).toUpperCase();
+
+  if (failed) {
+    return (
+      <View style={styles.companyLogoFallback}>
+        <Text style={styles.companyLogoFallbackText}>{initials}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: getStockLogoUri(symbol) }}
+      style={styles.companyLogo}
+      contentFit="contain"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function SearchScreen() {
   const colors = usePortfolioColors();
@@ -74,24 +98,23 @@ export default function SearchScreen() {
     ? `${resolvedStock!.symbol} · 1Y Price`
     : 'Portfolio · 1Y Growth';
 
-  const primaryMetricLabel = isStockSearch ? 'Current price' : 'Total value';
-  const primaryMetricValue = isStockSearch
+  const changeValue = isStockSearch
+    ? resolvedStock!.yearlyChangePct
+    : holdings.reduce((sum, h) => sum + h.yearlyChangePct, 0) / Math.max(holdings.length, 1);
+  const changeLabel = `${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(1)}% ${searchSource === 'finnhub' ? 'today' : 'this year'}`;
+
+  const stockPrice = isStockSearch
     ? `$${resolvedStock!.currentPrice.toFixed(2)}`
     : `$${totalPortfolioValue.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
 
-  const changeValue = isStockSearch
-    ? resolvedStock!.yearlyChangePct
-    : holdings.reduce((sum, h) => sum + h.yearlyChangePct, 0) / Math.max(holdings.length, 1);
-  const changeLabel = `${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(1)}% ${searchSource === 'finnhub' ? 'today' : 'this year'}`;
-  
-  const secondaryMetricLabel = isStockSearch ? 'Ticker' : 'Holdings';
-  const secondaryMetricValue = isStockSearch ? resolvedStock!.symbol : `${holdings.length}`;
-  const secondaryMetricSub = isStockSearch ? resolvedStock!.displayName : 'Active positions';
-
-  const stockIsWatched = isStockSearch ? isWatched(resolvedStock!.symbol) : false;
+  const ownedHolding = isStockSearch
+    ? holdings.find((holding) => holding.symbol === resolvedStock!.symbol)
+    : undefined;
+  const stockIsOwned = Boolean(ownedHolding && ownedHolding.shares > 0);
+  const stockIsWatched = isStockSearch && !stockIsOwned ? isWatched(resolvedStock!.symbol) : false;
   const handleToggleWatchlist = useCallback(() => {
     if (!isStockSearch) return;
     toggleWatchlist({
@@ -106,6 +129,10 @@ export default function SearchScreen() {
     : 'Market News';
 
   // ── Prediction handler ───────────────────────────────────────────────────
+  const handlePickPress = useCallback((symbol: string) => {
+    setQuery(symbol);
+  }, []);
+
   const handleGetPrediction = useCallback(async () => {
     if (hasUnresolvedQuery) return;
 
@@ -163,50 +190,36 @@ export default function SearchScreen() {
 {hasUnresolvedQuery && (
   <View style={styles.unresolvedBanner}>
     <View style={styles.unresolvedAccent} />
-    <Text style={styles.unresolvedText}>
-      No match for &ldquo;{trimmedQuery}&rdquo;. Try a ticker (e.g. AAPL) or company name.
-    </Text>
+    <Text style={styles.unresolvedText}>Stock doesn&apos;t exist.</Text>
   </View>
 )}
 
-        {/* ── Bento grid (hidden when query is unresolved) ────────────────── */}
-        {!hasUnresolvedQuery && !searchLoading && (
+        {/* ── Bento grid (stock results only) ─────────────────────────────── */}
+        {isStockSearch && !searchLoading && (
   <View style={styles.bento}>
 
-            {/* Row 1: two stat tiles side-by-side */}
-            <View style={styles.bentoRow}>
-
-              {/* Primary: value + change — dark green tile */}
-              <View style={[styles.tile, styles.tileDark, { flex: 1.1 }]}>
-                <Text style={[styles.tileLabel, { color: GL.green400 }]}>
-                  {primaryMetricLabel}
+            {/* Company header */}
+            <View style={styles.companyHeader}>
+              <StockLogo symbol={resolvedStock!.symbol} />
+              <View style={styles.companyHeaderText}>
+                <Text style={styles.companyName} numberOfLines={2}>
+                  {resolvedStock!.displayName}
                 </Text>
-                <Text style={[styles.tileValue, { color: GL.white }]}>
-                  {primaryMetricValue}
-                </Text>
-                <View style={styles.changePill}>
-                  <Text style={styles.changePillText}>{changeLabel}</Text>
+                <Text style={styles.companySymbol}>{resolvedStock!.symbol}</Text>
+              </View>
+              <View style={styles.companyHeaderPrice}>
+                <Text style={styles.companyPrice}>{stockPrice}</Text>
+                <View style={styles.headerChangePill}>
+                  <Text style={styles.headerChangePillText}>{changeLabel}</Text>
                 </View>
               </View>
-
-              {/* Secondary: holdings / ticker — light green tile */}
-              <View style={[styles.tile, styles.tileLight, { flex: 0.9 }]}>
-                <Text style={[styles.tileLabel, { color: GL.green400 }]}>
-                  {secondaryMetricLabel}
-                </Text>
-                <Text style={[styles.tileValue, { color: GL.white }]}>
-                  {secondaryMetricValue}
-                </Text>
-                <Text style={styles.tileSub}>{secondaryMetricSub}</Text>
-              </View>
-
             </View>
 
-            {/* Row 2: chart tile — full width, mid-green */}
+            {/* Chart tile — full width, mid-green */}
             <View style={[styles.tile, styles.tileMid, styles.tileWide]}>
               <View style={styles.chartHeader}>
                 <Text style={styles.chartTileTitle}>{graphTitle}</Text>
-                {isStockSearch && (
+                {isStockSearch && !stockIsOwned && (
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={handleToggleWatchlist}
@@ -223,6 +236,9 @@ export default function SearchScreen() {
               </View>
               <View style={styles.graphWrapper}>
                 <PortfolioGraph
+                  compact
+                  embedded
+                  showAxes
                   initialPeriod="1Y"
                   periods={['1Y']}
                   dataByPeriod={{ '1Y': oneYearChartData }}
@@ -262,7 +278,8 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {/* ── News section ────────────────────────────────────────────────── */}
+        {/* ── News section (stock results only) ───────────────────────────── */}
+        {isStockSearch && !searchLoading && (
         <View style={styles.newsSection}>
 
           {/* Section header */}
@@ -272,30 +289,20 @@ export default function SearchScreen() {
           </View>
 
           {/* States */}
-          {hasUnresolvedQuery && (
-            <Text style={styles.newsStateText}>
-              Enter a recognized stock or company to see related news.
-            </Text>
+          {newsLoading && (
+            <Text style={styles.newsStateText}>Loading company news…</Text>
           )}
-          {!hasUnresolvedQuery && newsLoading && (
-            <Text style={styles.newsStateText}>
-              {isStockSearch ? 'Loading company news…' : 'Loading portfolio news…'}
-            </Text>
-          )}
-          {!hasUnresolvedQuery && !newsLoading && newsError && (
+          {!newsLoading && newsError && (
             <Text style={[styles.newsStateText, { color: colors.errorRed }]}>{newsError}</Text>
           )}
-          {!hasUnresolvedQuery && !newsLoading && !newsError && articles.length === 0 && (
+          {!newsLoading && !newsError && articles.length === 0 && (
             <Text style={styles.newsStateText}>
-              {isStockSearch
-                ? `No recent news found for ${resolvedStock!.displayName}.`
-                : 'No major portfolio-related developments right now.'}
+              No recent news found for {resolvedStock!.displayName}.
             </Text>
           )}
 
           {/* Article list */}
-          {!hasUnresolvedQuery &&
-            !newsError &&
+          {!newsError &&
             articles.map((article, idx) => (
               <View
                 key={article.id}
@@ -311,14 +318,15 @@ export default function SearchScreen() {
                 <View style={styles.newsRowContent}>
                   <NewsRow
                     title={article.title}
-                    ageLabel={`${article.sourceName} · ${getAgeLabel(article.publishedAt)}`}
-                    logo={require('@/assets/images/icon.png')}
+                    sourceName={article.sourceName}
+                    ageLabel={getAgeLabel(article.publishedAt)}
                     onPress={() => { void Linking.openURL(article.url); }}
                   />
                 </View>
               </View>
             ))}
         </View>
+        )}
 
       </ScrollView>
 
@@ -328,6 +336,7 @@ export default function SearchScreen() {
         error={predictionError}
         prediction={prediction}
         onClose={() => setPredictionVisible(false)}
+        onPickPress={handlePickPress}
       />
     </TabScreenLayout>
   );
@@ -371,6 +380,75 @@ const styles = StyleSheet.create({
   bento: {
     gap: 8,
   },
+  companyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: GL.green900,
+    borderRadius: 16,
+    padding: 16,
+  },
+  companyLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: GL.white,
+  },
+  companyLogoFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: GL.green800,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  companyLogoFallbackText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: GL.green200,
+  },
+  companyHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  companyName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: GL.white,
+    letterSpacing: -0.3,
+  },
+  companySymbol: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GL.green400,
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  companyHeaderPrice: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+    marginLeft: 8,
+  },
+  companyPrice: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: GL.white,
+    letterSpacing: -0.6,
+  },
+  headerChangePill: {
+    marginTop: 6,
+    backgroundColor: GL.green800,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: GL.green700,
+  },
+  headerChangePillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: GL.green300,
+  },
   bentoRow: {
     flexDirection: 'row',
     gap: 8,
@@ -401,6 +479,7 @@ const styles = StyleSheet.create({
     backgroundColor: GL.green50,
     borderWidth: 1,
     borderColor: GL.green200,
+    overflow: 'visible',
   },
 
   // Stat tile typography
@@ -478,8 +557,11 @@ const styles = StyleSheet.create({
   },
   graphWrapper: {
     width: '100%',
-    alignItems: 'center',
-    overflow: 'visible',
+    minHeight: 220,
+    padding: 0,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+    marginTop: 4,
   },
 
   // CTA tile
@@ -533,6 +615,7 @@ const styles = StyleSheet.create({
 
   // ── News section ─────────────────────────────────────────────────────────
   newsSection: {
+    paddingTop: 20,
     gap: 0,
   },
   newsSectionHeader: {

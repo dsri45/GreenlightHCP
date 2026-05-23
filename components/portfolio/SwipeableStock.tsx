@@ -35,7 +35,9 @@ export function SwipeableStock({
   logo,
   isPositive = true,
   isStarred = false,
+  isOwned = false,
   onStarPress,
+  onSellPress,
   onDelete,
   onAdd,
   onPress,
@@ -112,10 +114,21 @@ export function SwipeableStock({
             </Text>
           </View>
 
-          {/* Star */}
-          {onStarPress != null && (
+          {/* Star or sell */}
+          {isOwned && onSellPress ? (
             <TouchableOpacity
-              style={styles.starButton}
+              style={styles.actionButton}
+              onPress={onSellPress}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="delete-outline" size={22} color="#DC2626" />
+            </TouchableOpacity>
+          ) : null}
+
+          {!isOwned && onStarPress != null ? (
+            <TouchableOpacity
+              style={styles.actionButton}
               onPress={onStarPress}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               activeOpacity={0.7}
@@ -126,7 +139,7 @@ export function SwipeableStock({
                 color={isStarred ? GL.green500 : GL.green200}
               />
             </TouchableOpacity>
-          )}
+          ) : null}
 
           </View>
         </TouchableOpacity>
@@ -211,8 +224,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
-  // Star
-  starButton: {
+  // Action icon
+  actionButton: {
     padding: Spacing.sm,
     flexShrink: 0,
   },

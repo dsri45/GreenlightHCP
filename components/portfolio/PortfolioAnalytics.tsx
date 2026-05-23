@@ -67,14 +67,16 @@ export function PortfolioAnalytics({ analytics }: PortfolioAnalyticsProps) {
       {/* Divider */}
       <View style={styles.divider} />
 
-      <AnalyticsRow
-        label="Start"
-        value={formatCurrency(analytics.startingAmount)}
-      />
-      <AnalyticsRow
-        label="Current"
-        value={formatCurrency(analytics.currentAmount)}
-      />
+      <View style={styles.metricsPair}>
+        <AnalyticsRow
+          label="Start"
+          value={formatCurrency(analytics.startingAmount)}
+        />
+        <AnalyticsRow
+          label="Current"
+          value={formatCurrency(analytics.currentAmount)}
+        />
+      </View>
 
       <View style={styles.divider} />
 
@@ -86,16 +88,18 @@ export function PortfolioAnalytics({ analytics }: PortfolioAnalyticsProps) {
 
       <View style={styles.divider} />
 
-      <AnalyticsRow
-        label="Best"
-        value={`${analytics.mostProfitable.symbol} ${formatGain(analytics.mostProfitable.gain)}`}
-        valueColor={GL.green600}
-      />
-      <AnalyticsRow
-        label="Worst"
-        value={`${analytics.leastProfitable.symbol} ${formatGain(analytics.leastProfitable.gain)}`}
-        valueColor={analytics.leastProfitable.gain >= 0 ? GL.green600 : colors.errorRed}
-      />
+      <View style={styles.metricsPair}>
+        <AnalyticsRow
+          label="Best"
+          value={`${analytics.mostProfitable.symbol} ${formatGain(analytics.mostProfitable.gain)}`}
+          valueColor={GL.green600}
+        />
+        <AnalyticsRow
+          label="Worst"
+          value={`${analytics.leastProfitable.symbol} ${formatGain(analytics.leastProfitable.gain)}`}
+          valueColor={analytics.leastProfitable.gain >= 0 ? GL.green600 : colors.errorRed}
+        />
+      </View>
 
     </View>
   );
@@ -104,19 +108,20 @@ export function PortfolioAnalytics({ analytics }: PortfolioAnalyticsProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    flex: 1,
     backgroundColor: GL.green900,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 12,
     gap: Spacing.sm,
-    alignItems: 'flex-end',
+    alignItems: 'stretch',
   },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: 6,
     width: '100%',
     marginBottom: 2,
@@ -144,10 +149,18 @@ const styles = StyleSheet.create({
   },
 
   // Row
-  row: {
-    gap: 1,
-    alignItems: 'flex-end',
+  metricsPair: {
+    flexDirection: 'row',
+    gap: 8,
     width: '100%',
+  },
+  row: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
   },
   rowLabel: {
     fontSize: 10,
@@ -155,12 +168,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     color: GL.dimGreen,
-    textAlign: 'right',
+    flexShrink: 0,
   },
   rowValue: {
-    fontSize: 13,
+    flex: 1,
+    fontSize: 12,
     fontWeight: '600',
     textAlign: 'right',
-    lineHeight: 17,
+    lineHeight: 16,
   },
 });
