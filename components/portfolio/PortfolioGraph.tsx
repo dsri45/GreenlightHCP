@@ -2,7 +2,7 @@ import { BorderRadius, Spacing } from '@/constants/theme';
 import { Typography } from '@/constants/typography';
 import { ChartData, chartDataByPeriod } from '@/data/mockChartData';
 import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path, Line as SvgLine } from 'react-native-svg';
 import { TimePeriodButton } from './TimePeriodButton';
@@ -111,6 +111,12 @@ export function PortfolioGraph({
 
   const fallbackPeriod = periods.includes(initialPeriod) ? initialPeriod : periods[0] ?? '1M';
   const activePeriod = periods.includes(selectedPeriod) ? selectedPeriod : fallbackPeriod;
+
+  useEffect(() => {
+    if (!periods.includes(selectedPeriod)) {
+      setSelectedPeriod(fallbackPeriod);
+    }
+  }, [fallbackPeriod, periods, selectedPeriod]);
 
   const data = useMemo(() => toCartesianData(activePeriod, dataByPeriod), [activePeriod, dataByPeriod]);
 

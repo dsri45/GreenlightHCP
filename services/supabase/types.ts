@@ -16,3 +16,9 @@ export interface DbUserToStock {
 export interface DbUserToStockWithStock extends DbUserToStock {
   stocks: DbStock | null;
 }
+
+export interface DbUserPortfolio {
+  id: string;
+  user_id: string;
+  money: number;
+}

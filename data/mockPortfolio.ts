@@ -1,4 +1,9 @@
 import { ChartData } from './mockChartData';
+import {
+  getAvailableChartPeriods,
+  getChartWindowStart,
+  PORTFOLIO_CHART_PERIODS,
+} from '@/utils/portfolio-chart-periods';
 
 export interface PortfolioHolding {
   symbol: string;
@@ -61,6 +66,8 @@ export function buildOneYearStockChartData(stock: {
 export interface PortfolioAnalyticsSummary {
   startingAmount: number;
   currentAmount: number;
+  cashAvailable: number;
+  investedValue: number;
   totalGainLoss: number;
   totalGainLossPct: number;
   mostProfitable: { symbol: string; gain: number };
@@ -71,15 +78,21 @@ function displaySymbol(symbol: string): string {
   return symbol.includes(':') ? symbol.split(':').pop()?.trim() ?? symbol : symbol;
 }
 
-export function computePortfolioAnalytics(holdings: PortfolioHolding[]): PortfolioAnalyticsSummary {
-  let startingAmount = 0;
-  let currentAmount = 0;
+export function computePortfolioAnalytics(
+  holdings: PortfolioHolding[],
+  cash: number,
+  initialBalance = 5000,
+): PortfolioAnalyticsSummary {
+  const investedValue = holdings.reduce(
+    (sum, holding) => sum + holding.currentPrice * holding.shares,
+    0,
+  );
+  const currentAmount = cash + investedValue;
+  const startingAmount = initialBalance;
 
   const stockStats = holdings.map((holding) => {
     const currentValue = holding.currentPrice * holding.shares;
     const startingValue = currentValue / (1 + holding.yearlyChangePct / 100);
-    startingAmount += startingValue;
-    currentAmount += currentValue;
     return {
       symbol: displaySymbol(holding.symbol),
       gain: currentValue - startingValue,
@@ -94,6 +107,8 @@ export function computePortfolioAnalytics(holdings: PortfolioHolding[]): Portfol
   return {
     startingAmount: Math.round(startingAmount),
     currentAmount: Math.round(currentAmount),
+    cashAvailable: Math.round(cash),
+    investedValue: Math.round(investedValue),
     totalGainLoss: Math.round(totalGainLoss),
     totalGainLossPct: startingAmount > 0 ? (totalGainLoss / startingAmount) * 100 : 0,
     mostProfitable: most,
@@ -132,7 +147,11 @@ function getIntradayLabels(count: number): string[] {
   });
 }
 
-function buildSeries(holdings: PortfolioHolding[], pointCount: number): number[] {
+function buildInvestedSeries(holdings: PortfolioHolding[], pointCount: number): number[] {
+  if (holdings.length === 0) {
+    return Array.from({ length: pointCount }, () => 0);
+  }
+
   const totals = Array.from({ length: pointCount }, () => 0);
 
   holdings.forEach((holding, stockIndex) => {
@@ -151,10 +170,80 @@ function buildSeries(holdings: PortfolioHolding[], pointCount: number): number[]
 
   totals[totals.length - 1] = holdings.reduce(
     (sum, holding) => sum + holding.currentPrice * holding.shares,
-    0
+    0,
   );
 
-  return totals.map((value) => Math.round(value));
+  return totals;
+}
+
+function getLabelsForWindow(windowStart: Date, windowEnd: Date, pointCount: number): string[] {
+  const spanMs = windowEnd.getTime() - windowStart.getTime();
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const dayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+  const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+  const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+
+  return Array.from({ length: pointCount }, (_, index) => {
+    const progress = pointCount <= 1 ? 1 : index / (pointCount - 1);
+    const timestamp = windowStart.getTime() + spanMs * progress;
+    const date = new Date(timestamp);
+
+    if (index === pointCount - 1) return 'Now';
+    if (spanMs < 2 * 24 * 60 * 60 * 1000) return timeFormatter.format(date);
+    if (spanMs < 10 * 24 * 60 * 60 * 1000) return weekdayFormatter.format(date);
+    if (spanMs < 120 * 24 * 60 * 60 * 1000) return dayFormatter.format(date);
+    return monthFormatter.format(date);
+  });
+}
+
+function getPointCountForWindow(windowStart: Date, windowEnd: Date, period: string): number {
+  const spanMs = windowEnd.getTime() - windowStart.getTime();
+  const spanDays = spanMs / (24 * 60 * 60 * 1000);
+
+  if (period === '1D' || spanDays < 1.5) return Math.max(2, Math.min(6, Math.ceil(spanDays * 6) + 1));
+  if (period === '1W' || spanDays < 10) return Math.max(2, Math.min(7, Math.ceil(spanDays) + 1));
+  if (period === '1M' || spanDays < 45) return Math.max(2, Math.min(30, Math.ceil(spanDays)));
+  if (period === '3M') return Math.max(2, Math.min(12, Math.ceil(spanDays / 7)));
+  if (period === '6M' || period === 'YTD') return Math.max(2, Math.min(12, Math.ceil(spanDays / 30)));
+  return Math.max(2, Math.min(12, Math.ceil(spanDays / 30)));
+}
+
+function buildSeries(
+  holdings: PortfolioHolding[],
+  pointCount: number,
+  cash: number,
+  initialBalance = 5000,
+  useHoldingTrends = true,
+): number[] {
+  const currentTotal =
+    cash + holdings.reduce((sum, holding) => sum + holding.currentPrice * holding.shares, 0);
+  const lastIndex = Math.max(pointCount - 1, 1);
+
+  if (!useHoldingTrends || holdings.length === 0) {
+    return Array.from({ length: pointCount }, (_, index) => {
+      const progress = index / lastIndex;
+      return Math.round(initialBalance + (currentTotal - initialBalance) * progress);
+    });
+  }
+
+  const investedSeries = buildInvestedSeries(holdings, pointCount);
+  const startInvested = investedSeries[0];
+  const endInvested = investedSeries[pointCount - 1];
+  const investedRange = endInvested - startInvested;
+  const totalRange = currentTotal - initialBalance;
+
+  return investedSeries.map((investedValue, index) => {
+    if (Math.abs(investedRange) < 0.01) {
+      const progress = index / lastIndex;
+      return Math.round(initialBalance + totalRange * progress);
+    }
+
+    const progress = (investedValue - startInvested) / investedRange;
+    return Math.round(initialBalance + totalRange * progress);
+  });
 }
 
 function chartEntry(labels: string[], data: number[]): ChartData {
@@ -170,54 +259,77 @@ function chartEntry(labels: string[], data: number[]): ChartData {
   };
 }
 
-export function buildPortfolioChartDataByPeriod(holdings: PortfolioHolding[]): Record<string, ChartData> {
-  const today = new Date();
-  const ytdMonths = today.getMonth() + 1;
+function buildChartForPeriod(
+  period: string,
+  holdings: PortfolioHolding[],
+  cash: number,
+  initialBalance: number,
+  accountCreatedAt: Date,
+  now: Date,
+): ChartData {
+  const windowStart = getChartWindowStart(period, accountCreatedAt, now);
+  const windowEnd = now;
+  const accountCoversFullWindow = windowStart.getTime() <= accountCreatedAt.getTime() + 60_000;
+  const pointCount = getPointCountForWindow(windowStart, windowEnd, period);
+  const labels = getLabelsForWindow(windowStart, windowEnd, pointCount);
+  const useHoldingTrends = !accountCoversFullWindow;
 
-  return {
-    '1D': chartEntry(getIntradayLabels(6), buildSeries(holdings, 6)),
-    '1W': chartEntry(getDayLabels(7, 'weekday'), buildSeries(holdings, 7)),
-    '1M': chartEntry(getDayLabels(30, 'date'), buildSeries(holdings, 30)),
-    '3M': chartEntry(getMonthLabelsBack(3), buildSeries(holdings, 3)),
-    '6M': chartEntry(getMonthLabelsBack(6), buildSeries(holdings, 6)),
-    YTD: chartEntry(getMonthLabelsBack(ytdMonths), buildSeries(holdings, ytdMonths)),
-    '1Y': chartEntry(getMonthLabelsBack(12), buildSeries(holdings, 12)),
-    '2Y': chartEntry(getMonthLabelsBack(12), buildSeries(holdings, 12)),
-  };
-}
-
-export function buildOneYearPortfolioChartData(holdings: PortfolioHolding[]): ChartData {
-  const labels = getMonthLabels();
-  const monthlyTotals = Array.from({ length: labels.length }, () => 0);
-
-  holdings.forEach((holding, stockIndex) => {
-    const currentValue = holding.currentPrice * holding.shares;
-    const baseline = currentValue / (1 + holding.yearlyChangePct / 100);
-    const volatility = Math.max(8, currentValue * 0.015);
-
-    monthlyTotals.forEach((_, monthIndex) => {
-      const progress = monthIndex / (labels.length - 1);
-      const trendValue = baseline + (currentValue - baseline) * progress;
-      const waveOffset =
-        Math.sin((monthIndex + stockIndex * 1.7) * 0.9) * volatility * (1 - progress * 0.4);
-
-      monthlyTotals[monthIndex] += clampMin(trendValue + waveOffset);
-    });
-  });
-
-  monthlyTotals[monthlyTotals.length - 1] = holdings.reduce(
-    (sum, holding) => sum + holding.currentPrice * holding.shares,
-    0
+  const data = buildSeries(
+    holdings,
+    pointCount,
+    cash,
+    initialBalance,
+    useHoldingTrends,
   );
 
-  return {
-    labels,
-    datasets: [
-      {
-        data: monthlyTotals.map((value) => Math.round(value)),
-        color: (opacity = 1) => `rgba(24, 131, 67, ${opacity})`,
-        strokeWidth: 3,
-      },
-    ],
-  };
+  if (accountCoversFullWindow && data.length > 0) {
+    data[0] = Math.round(initialBalance);
+    data[data.length - 1] = Math.round(
+      cash + holdings.reduce((sum, holding) => sum + holding.currentPrice * holding.shares, 0),
+    );
+  }
+
+  return chartEntry(labels, data);
+}
+
+export function buildPortfolioChartDataByPeriod(
+  holdings: PortfolioHolding[],
+  cash: number,
+  initialBalance = 5000,
+  accountCreatedAt: Date | null = null,
+): Record<string, ChartData> {
+  const now = new Date();
+  const createdAt = accountCreatedAt ?? now;
+  const availablePeriods = getAvailableChartPeriods(createdAt, PORTFOLIO_CHART_PERIODS, now);
+
+  const result: Record<string, ChartData> = {};
+  for (const period of availablePeriods) {
+    result[period] = buildChartForPeriod(
+      period,
+      holdings,
+      cash,
+      initialBalance,
+      createdAt,
+      now,
+    );
+  }
+  return result;
+}
+
+export { getAvailableChartPeriods, getDefaultChartPeriod } from '@/utils/portfolio-chart-periods';
+
+export function buildOneYearPortfolioChartData(
+  holdings: PortfolioHolding[],
+  cash: number,
+  initialBalance = 5000,
+  accountCreatedAt: Date | null = null,
+): ChartData {
+  const now = new Date();
+  const createdAt = accountCreatedAt ?? now;
+
+  if (getAvailableChartPeriods(createdAt, ['1Y'], now).length === 0) {
+    return buildChartForPeriod('1D', holdings, cash, initialBalance, createdAt, now);
+  }
+
+  return buildChartForPeriod('1Y', holdings, cash, initialBalance, createdAt, now);
 }

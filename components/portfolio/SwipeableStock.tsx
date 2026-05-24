@@ -25,6 +25,7 @@ const GL = {
 interface SwipeableStockProps extends StockProps {
   onDelete?: () => void;
   onAdd?: () => void;
+  onBuyPress?: () => void;
   onPress?: () => void;
 }
 
@@ -40,6 +41,7 @@ export function SwipeableStock({
   onSellPress,
   onDelete,
   onAdd,
+  onBuyPress,
   onPress,
 }: SwipeableStockProps) {
   const colors = usePortfolioColors();
@@ -117,7 +119,7 @@ export function SwipeableStock({
           {/* Star or sell */}
           {isOwned && onSellPress ? (
             <TouchableOpacity
-              style={styles.actionButton}
+              style={styles.iconActionButton}
               onPress={onSellPress}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               activeOpacity={0.7}
@@ -126,9 +128,20 @@ export function SwipeableStock({
             </TouchableOpacity>
           ) : null}
 
+          {!isOwned && onBuyPress ? (
+            <TouchableOpacity
+              style={styles.iconActionButton}
+              onPress={onBuyPress}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="add-circle-outline" size={24} color={GL.green600} />
+            </TouchableOpacity>
+          ) : null}
+
           {!isOwned && onStarPress != null ? (
             <TouchableOpacity
-              style={styles.actionButton}
+              style={styles.iconActionButton}
               onPress={onStarPress}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               activeOpacity={0.7}
@@ -225,7 +238,7 @@ const styles = StyleSheet.create({
   },
 
   // Action icon
-  actionButton: {
+  iconActionButton: {
     padding: Spacing.sm,
     flexShrink: 0,
   },

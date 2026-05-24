@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import { ensureStockByAbbreviation } from '@/services/supabase/stocks';
 import type { DbUserToStockWithStock, InvestingType } from '@/services/supabase/types';
+import {
+  adjustUserCash,
+  ensureUserPortfolio,
+  InsufficientFundsError,
+} from '@/services/supabase/user-portfolio';
+
+export { InsufficientFundsError };
 
 function oppositeInvestingType(investing: InvestingType): InvestingType {
   return investing === 'investing' ? 'watchlist' : 'investing';
@@ -52,35 +59,50 @@ export async function buyInvestingShares(
   userId: string,
   abbreviation: string,
   count: number,
+  pricePerShare: number,
 ): Promise<void> {
   if (count <= 0) return;
 
-  const stock = await ensureStockByAbbreviation(abbreviation);
-  await removeConflictingMembership(userId, stock.stock_id, 'investing');
-
-  const existing = await getInvestingRow(userId, stock.stock_id);
-  if (existing) {
-    const { error } = await supabase
-      .from('user_to_stocks')
-      .update({ shares: (existing.shares ?? 0) + count })
-      .eq('user_to_stock_id', existing.user_to_stock_id);
-    if (error) throw error;
-    return;
+  const totalCost = count * pricePerShare;
+  const portfolio = await ensureUserPortfolio(userId);
+  if (portfolio.money < totalCost) {
+    throw new InsufficientFundsError(totalCost, portfolio.money);
   }
 
-  const { error } = await supabase.from('user_to_stocks').insert({
-    user_id: userId,
-    stock_id: stock.stock_id,
-    investing: 'investing',
-    shares: count,
-  });
-  if (error) throw error;
+  await adjustUserCash(userId, -totalCost);
+
+  try {
+    const stock = await ensureStockByAbbreviation(abbreviation);
+    await removeConflictingMembership(userId, stock.stock_id, 'investing');
+
+    const existing = await getInvestingRow(userId, stock.stock_id);
+    if (existing) {
+      const { error } = await supabase
+        .from('user_to_stocks')
+        .update({ shares: (existing.shares ?? 0) + count })
+        .eq('user_to_stock_id', existing.user_to_stock_id);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await supabase.from('user_to_stocks').insert({
+      user_id: userId,
+      stock_id: stock.stock_id,
+      investing: 'investing',
+      shares: count,
+    });
+    if (error) throw error;
+  } catch (error) {
+    await adjustUserCash(userId, totalCost);
+    throw error;
+  }
 }
 
 export async function sellInvestingShares(
   userId: string,
   abbreviation: string,
   count: number,
+  pricePerShare: number,
 ): Promise<void> {
   if (count <= 0) return;
 
@@ -92,21 +114,24 @@ export async function sellInvestingShares(
   const toSell = Math.min(count, currentShares);
   if (toSell <= 0) return;
 
+  const proceeds = toSell * pricePerShare;
   const remaining = currentShares - toSell;
+
   if (remaining <= 0) {
     const { error } = await supabase
       .from('user_to_stocks')
       .delete()
       .eq('user_to_stock_id', existing.user_to_stock_id);
     if (error) throw error;
-    return;
+  } else {
+    const { error } = await supabase
+      .from('user_to_stocks')
+      .update({ shares: remaining })
+      .eq('user_to_stock_id', existing.user_to_stock_id);
+    if (error) throw error;
   }
 
-  const { error } = await supabase
-    .from('user_to_stocks')
-    .update({ shares: remaining })
-    .eq('user_to_stock_id', existing.user_to_stock_id);
-  if (error) throw error;
+  await adjustUserCash(userId, proceeds);
 }
 
 export async function upsertUserStock(
@@ -140,9 +165,13 @@ export async function addUserStockByAbbreviation(
   userId: string,
   abbreviation: string,
   investing: InvestingType,
+  pricePerShare?: number,
 ): Promise<void> {
   if (investing === 'investing') {
-    await buyInvestingShares(userId, abbreviation, 1);
+    if (pricePerShare == null) {
+      throw new Error('Price is required when buying shares.');
+    }
+    await buyInvestingShares(userId, abbreviation, 1, pricePerShare);
     return;
   }
 

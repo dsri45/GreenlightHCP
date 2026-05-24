@@ -1,5 +1,6 @@
 import { TabScreenLayout } from '@/components/layouts/TabScreenLayout';
 import { PortfolioGraph } from '@/components/portfolio';
+import { BuySharesModal, SellSharesModal } from '@/components/portfolio/ShareTradeModals';
 import { NewsRow } from '@/components/search/NewsRow';
 import { PredictionModal } from '@/components/search/PredictionModal';
 import { SearchBar } from '@/components/search/SearchBar';
@@ -9,11 +10,14 @@ import { usePortfolioColors } from '@/hooks/use-portfolio-colors';
 import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
 import { usePortfolioNews } from '@/hooks/use-portfolio-news';
 import { useResolvedStock } from '@/hooks/use-resolved-stock';
+import { useUserCreatedAt } from '@/hooks/use-user-created-at';
 import { useWatchlist } from '@/hooks/use-watchlist';
 import { fetchStockPrediction, StockPrediction } from '@/services/claude-prediction';
+import { DEFAULT_STARTING_CASH } from '@/services/supabase/user-portfolio';
 import { getStockLogoUri } from '@/utils/stock-logo';
 import { Image } from 'expo-image';
-import React, { useCallback, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 
@@ -60,13 +64,27 @@ function StockLogo({ symbol }: { symbol: string }) {
 
 export default function SearchScreen() {
   const colors = usePortfolioColors();
+  const { q } = useLocalSearchParams<{ q?: string }>();
   const [query, setQuery] = useState('');
   const [predictionVisible, setPredictionVisible] = useState(false);
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [predictionError, setPredictionError] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<StockPrediction | null>(null);
-  const { holdings } = usePortfolioHoldings();
+  const [buyModalVisible, setBuyModalVisible] = useState(false);
+  const [buyQuantity, setBuyQuantity] = useState('1');
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const [sellModalVisible, setSellModalVisible] = useState(false);
+  const [sellQuantity, setSellQuantity] = useState('1');
+  const [sellError, setSellError] = useState<string | null>(null);
+  const { holdings, cash, totalValue, buyShares, sellShares } = usePortfolioHoldings();
+  const { createdAt: accountCreatedAt } = useUserCreatedAt();
   const { isWatched, toggleWatchlist } = useWatchlist();
+
+  useEffect(() => {
+    if (typeof q === 'string' && q.trim()) {
+      setQuery(q.trim());
+    }
+  }, [q]);
 
   const trimmedQuery = query.trim();
   const { stock: resolvedStock, loading: searchLoading, source: searchSource } = useResolvedStock(trimmedQuery, holdings);
@@ -85,13 +103,10 @@ export default function SearchScreen() {
         yearlyChangePct: resolvedStock.yearlyChangePct,
       });
     }
-    return buildOneYearPortfolioChartData(holdings);
-  }, [holdings, resolvedStock]);
+    return buildOneYearPortfolioChartData(holdings, cash, DEFAULT_STARTING_CASH, accountCreatedAt);
+  }, [accountCreatedAt, holdings, cash, resolvedStock]);
 
-  const totalPortfolioValue = useMemo(
-    () => holdings.reduce((sum, stock) => sum + stock.currentPrice * stock.shares, 0),
-    [holdings]
-  );
+  const totalPortfolioValue = totalValue;
 
   // ── Derived display values ───────────────────────────────────────────────
   const graphTitle = isStockSearch
@@ -123,6 +138,89 @@ export default function SearchScreen() {
       yearlyChangePct: resolvedStock!.yearlyChangePct,
     });
   }, [isStockSearch, resolvedStock, toggleWatchlist]);
+
+  const openBuyModal = useCallback(() => {
+    setBuyQuantity('1');
+    setBuyError(null);
+    setBuyModalVisible(true);
+  }, []);
+
+  const closeBuyModal = useCallback(() => {
+    setBuyModalVisible(false);
+    setBuyQuantity('1');
+    setBuyError(null);
+  }, []);
+
+  const openSellModal = useCallback(() => {
+    setSellQuantity('1');
+    setSellError(null);
+    setSellModalVisible(true);
+  }, []);
+
+  const closeSellModal = useCallback(() => {
+    setSellModalVisible(false);
+    setSellQuantity('1');
+    setSellError(null);
+  }, []);
+
+  const parsedBuyQuantity = parseInt(buyQuantity, 10);
+  const parsedSellQuantity = parseInt(sellQuantity, 10);
+
+  const handleBuyShares = useCallback(async () => {
+    if (!isStockSearch || !resolvedStock) return;
+    if (Number.isNaN(parsedBuyQuantity) || parsedBuyQuantity <= 0) {
+      setBuyError('Enter a valid share quantity');
+      return;
+    }
+
+    const price = resolvedStock.currentPrice;
+    const totalCost = parsedBuyQuantity * price;
+    if (totalCost > cash) {
+      setBuyError(
+        `Insufficient funds. You need $${totalCost.toFixed(2)} but only have $${cash.toFixed(2)} available.`,
+      );
+      return;
+    }
+
+    closeBuyModal();
+    const result = await buyShares(
+      resolvedStock.symbol,
+      parsedBuyQuantity,
+      price,
+      resolvedStock.yearlyChangePct,
+    );
+
+    if (!result.ok) {
+      setBuyError(result.error);
+      setBuyModalVisible(true);
+      return;
+    }
+  }, [buyShares, cash, closeBuyModal, isStockSearch, parsedBuyQuantity, resolvedStock]);
+
+  const handleSellShares = useCallback(async () => {
+    if (!isStockSearch || !resolvedStock || !ownedHolding) return;
+    if (Number.isNaN(parsedSellQuantity) || parsedSellQuantity <= 0) {
+      setSellError('Enter a valid share quantity');
+      return;
+    }
+    if (parsedSellQuantity > ownedHolding.shares) {
+      setSellError(`You only have ${ownedHolding.shares} shares to sell`);
+      return;
+    }
+
+    const result = await sellShares(
+      resolvedStock.symbol,
+      parsedSellQuantity,
+      ownedHolding.currentPrice,
+    );
+
+    if (!result.ok) {
+      setSellError(result.error);
+      return;
+    }
+
+    closeSellModal();
+  }, [closeSellModal, isStockSearch, ownedHolding, parsedSellQuantity, resolvedStock, sellShares]);
 
   const newsSectionTitle = isStockSearch
     ? `${resolvedStock!.displayName} News`
@@ -219,20 +317,40 @@ export default function SearchScreen() {
             <View style={[styles.tile, styles.tileMid, styles.tileWide]}>
               <View style={styles.chartHeader}>
                 <Text style={styles.chartTileTitle}>{graphTitle}</Text>
-                {isStockSearch && !stockIsOwned && (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={handleToggleWatchlist}
-                    style={[
-                      styles.watchlistButton,
-                      stockIsWatched ? styles.watchlistButtonActive : styles.watchlistButtonInactive,
-                    ]}
-                  >
-                    <Text style={[styles.watchlistButtonText, stockIsWatched && styles.watchlistButtonTextActive]}>
-                      {stockIsWatched ? '★ Watching' : '☆ Add to watchlist'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <View style={styles.chartHeaderActions}>
+                  {isStockSearch && !stockIsOwned && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={handleToggleWatchlist}
+                      style={[
+                        styles.actionChip,
+                        stockIsWatched ? styles.watchlistButtonActive : styles.watchlistButtonInactive,
+                      ]}
+                    >
+                      <Text style={[styles.actionChipText, stockIsWatched && styles.watchlistButtonTextActive]}>
+                        {stockIsWatched ? '★ Watching' : '☆ Watchlist'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {isStockSearch && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={openBuyModal}
+                      style={[styles.actionChip, styles.buyButton]}
+                    >
+                      <Text style={styles.buyButtonText}>+ Buy</Text>
+                    </TouchableOpacity>
+                  )}
+                  {isStockSearch && stockIsOwned && ownedHolding && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={openSellModal}
+                      style={[styles.actionChip, styles.sellChipButton]}
+                    >
+                      <Text style={styles.sellButtonText}>Sell</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
               <View style={styles.graphWrapper}>
                 <PortfolioGraph
@@ -338,6 +456,34 @@ export default function SearchScreen() {
         onClose={() => setPredictionVisible(false)}
         onPickPress={handlePickPress}
       />
+
+      {isStockSearch && resolvedStock ? (
+        <BuySharesModal
+          visible={buyModalVisible}
+          symbol={resolvedStock.symbol}
+          pricePerShare={resolvedStock.currentPrice}
+          cashAvailable={cash}
+          quantity={buyQuantity}
+          error={buyError}
+          onQuantityChange={setBuyQuantity}
+          onBuy={() => void handleBuyShares()}
+          onClose={closeBuyModal}
+        />
+      ) : null}
+
+      {isStockSearch && resolvedStock && ownedHolding ? (
+        <SellSharesModal
+          visible={sellModalVisible}
+          symbol={resolvedStock.symbol}
+          ownedShares={ownedHolding.shares}
+          pricePerShare={ownedHolding.currentPrice}
+          quantity={sellQuantity}
+          error={sellError}
+          onQuantityChange={setSellQuantity}
+          onSell={() => void handleSellShares()}
+          onClose={closeSellModal}
+        />
+      ) : null}
     </TabScreenLayout>
   );
 }
@@ -526,14 +672,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 14,
   },
+  chartHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
   chartTileTitle: {
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: GL.green700,
+    flexShrink: 0,
   },
-  watchlistButton: {
+  actionChip: {
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -547,13 +700,31 @@ const styles = StyleSheet.create({
     borderColor: GL.green500,
     backgroundColor: GL.green100,
   },
-  watchlistButtonText: {
+  actionChipText: {
     fontSize: 11,
     fontWeight: '700',
     color: GL.green700,
   },
   watchlistButtonTextActive: {
     color: GL.green900,
+  },
+  buyButton: {
+    borderColor: GL.green600,
+    backgroundColor: GL.green600,
+  },
+  buyButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: GL.white,
+  },
+  sellChipButton: {
+    borderColor: '#DC2626',
+    backgroundColor: '#DC2626',
+  },
+  sellButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: GL.white,
   },
   graphWrapper: {
     width: '100%',

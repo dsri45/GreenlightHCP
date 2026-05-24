@@ -11,12 +11,21 @@ interface StockListProps {
   stocks: StockData[];
   onDelete?: (stock: StockData) => void;
   onAdd?: (stock: StockData) => void;
+  onBuyPress?: (stock: StockData) => void;
   onStarPress?: (stock: StockData) => void;
   onSellPress?: (stock: StockData) => void;
   onPress?: (stock: StockData) => void;
 }
 
-export function StockList({ stocks, onDelete, onAdd, onStarPress, onSellPress, onPress }: StockListProps) {
+export function StockList({
+  stocks,
+  onDelete,
+  onAdd,
+  onBuyPress,
+  onStarPress,
+  onSellPress,
+  onPress,
+}: StockListProps) {
   return (
     <View style={styles.container}>
       {stocks.map((stock, index) => (
@@ -30,6 +39,7 @@ export function StockList({ stocks, onDelete, onAdd, onStarPress, onSellPress, o
           isStarred={stock.isStarred}
           isOwned={stock.isOwned}
           onPress={onPress ? () => onPress?.(stock) : undefined}
+          onBuyPress={onBuyPress ? () => onBuyPress?.(stock) : undefined}
           onStarPress={!stock.isOwned && onStarPress ? () => onStarPress?.(stock) : undefined}
           onSellPress={stock.isOwned && onSellPress ? () => onSellPress?.(stock) : undefined}
           onDelete={onDelete ? () => onDelete?.(stock) : undefined}

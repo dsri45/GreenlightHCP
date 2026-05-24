@@ -1,22 +1,24 @@
 import { TabScreenLayout } from '@/components/layouts/TabScreenLayout';
 import { PortfolioAnalytics, PortfolioGraph } from '@/components/portfolio';
+import { SellSharesModal } from '@/components/portfolio/ShareTradeModals';
 import { StockData, StockList } from '@/components/portfolio/StockList';
 import { Spacing } from '@/constants/theme';
 import {
   buildPortfolioChartDataByPeriod,
   computePortfolioAnalytics,
+  getAvailableChartPeriods,
+  getDefaultChartPeriod,
 } from '@/data/mockPortfolio';
 import { usePortfolioHoldings } from '@/hooks/use-portfolio-holdings';
+import { useUserCreatedAt } from '@/hooks/use-user-created-at';
 import { useWatchlist } from '@/hooks/use-watchlist';
+import { DEFAULT_STARTING_CASH } from '@/services/supabase/user-portfolio';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Modal,
-  Pressable,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -38,14 +40,31 @@ const GL = {
 };
 
 export default function PortfolioScreen() {
-  const { holdings, addShare, sellShares } = usePortfolioHoldings();
+  const { holdings, cash, totalValue, addShare, sellShares } = usePortfolioHoldings();
   const { watchlist } = useWatchlist();
+  const { createdAt: accountCreatedAt } = useUserCreatedAt();
   const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const chartDataByPeriod = useMemo(() => buildPortfolioChartDataByPeriod(holdings), [holdings]);
-  const analytics = useMemo(() => computePortfolioAnalytics(holdings), [holdings]);
+  const availableChartPeriods = useMemo(
+    () => getAvailableChartPeriods(accountCreatedAt),
+    [accountCreatedAt],
+  );
+
+  const defaultChartPeriod = useMemo(
+    () => getDefaultChartPeriod(availableChartPeriods),
+    [availableChartPeriods],
+  );
+
+  const chartDataByPeriod = useMemo(
+    () => buildPortfolioChartDataByPeriod(holdings, cash, DEFAULT_STARTING_CASH, accountCreatedAt),
+    [holdings, cash, accountCreatedAt],
+  );
+  const analytics = useMemo(
+    () => computePortfolioAnalytics(holdings, cash, DEFAULT_STARTING_CASH),
+    [holdings, cash],
+  );
 
   const selectedHolding = selectedStock
     ? holdings.find((holding) => holding.symbol === selectedStock.symbol)
@@ -54,8 +73,12 @@ export default function PortfolioScreen() {
   const parsedQuantity = parseInt(quantity, 10);
 
   const handleAddStock = useCallback(
-    (stock: StockData) => {
-      addShare(stock.symbol);
+    async (stock: StockData) => {
+      const price = stock.currentPrice ?? 0;
+      const result = await addShare(stock.symbol, price);
+      if (!result.ok) {
+        Alert.alert('Cannot buy', result.error);
+      }
     },
     [addShare],
   );
@@ -72,7 +95,7 @@ export default function PortfolioScreen() {
     setActionError(null);
   }, []);
 
-  const handleSellShares = useCallback(() => {
+  const handleSellShares = useCallback(async () => {
     if (!selectedStock || !selectedHolding) return;
     if (Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
       setActionError('Enter a valid share quantity');
@@ -83,7 +106,13 @@ export default function PortfolioScreen() {
       return;
     }
 
-    void sellShares(selectedStock.symbol, parsedQuantity).then(closeModal);
+    const price = selectedHolding.currentPrice;
+    const result = await sellShares(selectedStock.symbol, parsedQuantity, price);
+    if (!result.ok) {
+      setActionError(result.error);
+      return;
+    }
+    closeModal();
   }, [closeModal, parsedQuantity, selectedHolding, selectedStock, sellShares]);
 
   const stocks = useMemo<StockData[]>(
@@ -102,7 +131,9 @@ export default function PortfolioScreen() {
   );
 
   const watchlistCount = watchlist.length;
-  const totalPositions = holdings.length;
+
+  const formatMoney = (value: number) =>
+    `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 
   return (
     <TabScreenLayout pageTitle="Portfolio">
@@ -112,18 +143,24 @@ export default function PortfolioScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Top bento strip: two quick-stat tiles ──────────────────────── */}
+        {/* ── Top bento strip: account balance + money to invest ─────────── */}
         <View style={styles.statStrip}>
           <View style={[styles.statTile, styles.statTileDark]}>
-            <Text style={[styles.statLabel, { color: GL.green400 }]}>Positions</Text>
-            <Text style={[styles.statValue, { color: GL.white }]}>{totalPositions}</Text>
-            <Text style={[styles.statSub, { color: GL.dimGreen }]}>Active holdings</Text>
+            <Text style={[styles.statLabel, { color: GL.green400 }]}>Account balance</Text>
+            <Text style={[styles.statValue, styles.statValueCompact, { color: GL.white }]}>
+              {formatMoney(totalValue)}
+            </Text>
+            <Text style={[styles.statSub, { color: GL.dimGreen }]}>
+              {holdings.length} {holdings.length === 1 ? 'position' : 'positions'} · {watchlistCount} watchlist
+            </Text>
           </View>
 
           <View style={[styles.statTile, styles.statTileDark]}>
-            <Text style={[styles.statLabel, { color: GL.green400 }]}>Watchlist</Text>
-            <Text style={[styles.statValue, { color: GL.white }]}>{watchlistCount}</Text>
-            <Text style={[styles.statSub, { color: GL.dimGreen }]}>Starred stocks</Text>
+            <Text style={[styles.statLabel, { color: GL.green400 }]}>Money to invest</Text>
+            <Text style={[styles.statValue, styles.statValueCompact, { color: GL.white }]}>
+              {formatMoney(cash)}
+            </Text>
+            <Text style={[styles.statSub, { color: GL.dimGreen }]}>Uninvested cash</Text>
           </View>
         </View>
 
@@ -137,6 +174,8 @@ export default function PortfolioScreen() {
                 embedded
                 showAxes
                 showBorder={false}
+                initialPeriod={defaultChartPeriod}
+                periods={availableChartPeriods}
                 dataByPeriod={chartDataByPeriod}
               />
             </View>
@@ -163,47 +202,17 @@ export default function PortfolioScreen() {
 
       </ScrollView>
 
-      <Modal visible={Boolean(selectedStock)} transparent animationType="fade" onRequestClose={closeModal}>
-        <Pressable style={styles.modalBackdrop} onPress={closeModal}>
-          <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
-            <Text style={styles.modalTitle}>
-              {selectedStock ? `Sell ${selectedStock.symbol}` : 'Sell shares'}
-            </Text>
-            <Text style={styles.modalSubtitle}>
-              You own {selectedHolding?.shares ?? 0}{' '}
-              {selectedHolding?.shares === 1 ? 'share' : 'shares'}.
-            </Text>
-
-            <TextInput
-              value={quantity}
-              onChangeText={setQuantity}
-              keyboardType="numeric"
-              placeholder="Number of shares"
-              placeholderTextColor={GL.green300}
-              style={styles.modalInput}
-            />
-
-            {actionError ? <Text style={styles.modalError}>{actionError}</Text> : null}
-
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                onPress={closeModal}
-                style={[styles.modalButton, styles.cancelButton]}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSellShares}
-                style={[styles.modalButton, styles.sellButton]}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalButtonText}>Sell</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <SellSharesModal
+        visible={Boolean(selectedStock)}
+        symbol={selectedStock?.symbol ?? ''}
+        ownedShares={selectedHolding?.shares ?? 0}
+        pricePerShare={selectedHolding?.currentPrice ?? 0}
+        quantity={quantity}
+        error={actionError}
+        onQuantityChange={setQuantity}
+        onSell={() => void handleSellShares()}
+        onClose={closeModal}
+      />
     </TabScreenLayout>
   );
 }
@@ -251,6 +260,9 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     marginBottom: 6,
   },
+  statValueCompact: {
+    fontSize: 22,
+  },
   statSub: {
     fontSize: 12,
     fontWeight: '400',
@@ -274,6 +286,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dashboardRow: {
+    gap: 8,
     minHeight: 280,
     width: '100%',
   },
@@ -313,70 +326,5 @@ const styles = StyleSheet.create({
   // ── Stock list wrapper ────────────────────────────────────────────────────
   stockListWrapper: {
     width: '100%',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  modalCard: {
-    backgroundColor: GL.white,
-    borderRadius: 20,
-    padding: Spacing.xl,
-    borderWidth: 1,
-    borderColor: GL.green100,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: GL.green900,
-    marginBottom: 6,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: GL.dimGreen,
-    marginBottom: Spacing.md,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: GL.green200,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: GL.green900,
-    marginBottom: Spacing.sm,
-  },
-  modalError: {
-    color: '#B91C1C',
-    fontSize: 12,
-    marginBottom: Spacing.sm,
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'flex-end',
-    marginTop: Spacing.sm,
-  },
-  modalButton: {
-    flex: 1,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: GL.green100,
-  },
-  cancelButtonText: {
-    color: GL.green800,
-    fontWeight: '700',
-  },
-  sellButton: {
-    backgroundColor: '#DC2626',
-  },
-  modalButtonText: {
-    color: GL.white,
-    fontWeight: '700',
   },
 });

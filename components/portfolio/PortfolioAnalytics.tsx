@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 12,
+    paddingBottom: 15,
     gap: Spacing.sm,
     alignItems: 'stretch',
   },
